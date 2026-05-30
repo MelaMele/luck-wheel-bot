@@ -15,11 +15,6 @@ dp = Dispatcher()
 
 active_games = {}
 
-# --- ⚠️ እዚህ ጋ ያገኘኸውን FILE ID ተክተህ የፈለግከውን ፎቶ መጠቀም ትችላለህ ---
-# አሁን ለሙከራ ያህል በጽሑፍ ብቻ እንዳይደናቀፍ አድርገነዋል
-START_PHOTO = "AgACAgQAAxkBAAMbZkm..." # ለጊዜው ባዶ ይሁን ወይም የፎቶ File ID ይግባበት
-# -------------------------------------------------------------------------
-
 @dp.message(Command("start"))
 async def start_handler(message: types.Message):
     welcome_text = (
@@ -36,17 +31,11 @@ async def start_handler(message: types.Message):
             buttons.append(row)
             row = []
             
-    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    # ለሙከራ ያህል ብቻ አዘጋጁ (Admin) 10 ሰው ሳይሞላ እጣ ማውጣት እንዲችል የሙከራ ቁልፍ መጨመር
+    buttons.append([InlineKeyboardButton(text="⚡ [Admin] ዕጣውን አሁኑኑ አስጀምር", callback_data="admin_force_spin")])
     
-    # ሰርቨሩ በሊንክ እንዳይደናቀፍ መጀመሪያ በጽሑፍ እንላከው (ፎቶ ለመጠቀም File ID እንተካለን)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     await message.answer(text=welcome_text, reply_markup=keyboard)
-
-
-# 💡 ይህ አዲስ ክፍል ፎቶ ስትልክለት የፋይሉን ID አውጥቶ ይሰጥሃል!
-@dp.message(lambda message: message.photo)
-async def get_photo_file_id(message: types.Message):
-    file_id = message.photo[-1].file_id
-    await message.reply(f"📷 የላኩት ፎቶ File ID ይህ ነው፦\n\n<code>{file_id}</code>", parse_mode="HTML")
 
 
 @dp.callback_query(lambda c: c.data.startswith("select_"))
@@ -55,16 +44,15 @@ async def number_selection_handler(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
     username = callback_query.from_user.full_name
     
-    await callback_query.answer(f"ቁጥር {selected_num}ን መርጠዋል!", show_alert=True)
-    
     chat_id = callback_query.message.chat.id
     if chat_id not in active_games:
         active_games[chat_id] = []
         
     if any(p["user_id"] == user_id for p in active_games[chat_id]):
-        await callback_query.message.answer(f"⚠️ {username} ከዚህ በፊት ቁጥር መርጠዋል። እባክዎ እጣው እስኪወጣ ይጠብቁ!")
+        await callback_query.answer("⚠️ ከዚህ በፊት ቁጥር መርጠዋል! እባክዎ እጣው እስኪወጣ ይጠብቁ።", show_alert=True)
         return
         
+    await callback_query.answer(f"ቁጥር {selected_num}ን መርጠዋል!", show_alert=True)
     active_games[chat_id].append({"user_id": user_id, "name": username, "num": selected_num})
     current_players = len(active_games[chat_id])
     
@@ -76,10 +64,25 @@ async def number_selection_handler(callback_query: types.CallbackQuery):
     if current_players >= 10:
         await start_spinning_effect(callback_query.message, chat_id)
 
+
+# 💡 ይህ አዘጋጁ 10 ሰው ሳይሞላ ጨዋታውን እንዲፈትሽ የሚያስችለው አዲሱ ቁልፍ ነው
+@dp.callback_query(lambda c: c.data == "admin_force_spin")
+async def admin_force_spin_handler(callback_query: types.CallbackQuery):
+    chat_id = callback_query.message.chat.id
+    
+    # አንድም ሰው ካልተመዘገበ ለሙከራ እንዲሆን ራስህንም ቢሆን አስገብቶ እንዲሰራ ማድረግ
+    if chat_id not in active_games or len(active_games[chat_id]) == 0:
+        active_games[chat_id] = [{"user_id": callback_query.from_user.id, "name": callback_query.from_user.full_name, "num": "7"}]
+        
+    await callback_query.answer("⚡ የሙከራ እጣ ማውጣት ተጀምሯል!...", show_alert=False)
+    await start_spinning_effect(callback_query.message, chat_id)
+
+
 async def start_spinning_effect(message: types.Message, chat_id: str):
+    # 1. መንኮራኩሩ ሲሽከረከር የሚታየው መልዕክት
     spinning_msg = await message.answer("⚡ መንኮራኩሩ በከፍተኛ ፍጥነት እየተሽከረከረ ነው! አሸናፊው ማን ይሆን?...")
     
-    await asyncio.sleep(5)
+    await asyncio.sleep(4)  # ለ 4 ሰከንድ እንዲሽከረከር ማድረግ
     
     winner_number = str(random.randint(1, 10))
     players = active_games[chat_id]
@@ -110,6 +113,7 @@ async def start_spinning_effect(message: types.Message, chat_id: str):
     await spinning_msg.delete()
     await message.answer(text=result_text, parse_mode="HTML", reply_markup=inline_claim if winner_user else None)
     
+    # ጨዋታውን ማጽዳት
     active_games[chat_id] = []
 
 async def main():
