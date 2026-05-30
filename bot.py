@@ -5,17 +5,20 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# ቶከኑን ከ GitHub Secrets ላይ በደህንነት ያነባል
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 if not BOT_TOKEN:
-    raise ValueError("ERROR: BOT_TOKEN አልተገኘም! እባክህ GitHub Secrets ላይ በትክክል አዋቅር።")
+    raise ValueError("ERROR: BOT_TOKEN አልተገኘም!")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# የተጫዋቾች መረጃ ጊዜያዊ ማከማቻ
 active_games = {}
+
+# --- ⚠️ እዚህ ጋ ያገኘኸውን FILE ID ተክተህ የፈለግከውን ፎቶ መጠቀም ትችላለህ ---
+# አሁን ለሙከራ ያህል በጽሑፍ ብቻ እንዳይደናቀፍ አድርገነዋል
+START_PHOTO = "AgACAgQAAxkBAAMbZkm..." # ለጊዜው ባዶ ይሁን ወይም የፎቶ File ID ይግባበት
+# -------------------------------------------------------------------------
 
 @dp.message(Command("start"))
 async def start_handler(message: types.Message):
@@ -25,7 +28,6 @@ async def start_handler(message: types.Message):
         "ለመጀመር ከታች ካሉት ቁጥሮች የፈለጉትን የዕድል ቁጥር ይምረጡ፦"
     )
     
-    # ከ1 እስከ 10 ያሉትን ቁጥሮች የያዘ ማራኪ ኪቦርድ መስራት
     buttons = []
     row = []
     for i in range(1, 11):
@@ -36,12 +38,16 @@ async def start_handler(message: types.Message):
             
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     
-    # ያጸደቅነውን አንደኛውን 3D መንኮራኩር ፎቶ መላክ
-    await message.answer_photo(
-        photo="https://raw.githubusercontent.com/Mela-Content-Bot/assets/main/wheel_start.jpg",
-        caption=welcome_text,
-        reply_markup=keyboard
-    )
+    # ሰርቨሩ በሊንክ እንዳይደናቀፍ መጀመሪያ በጽሑፍ እንላከው (ፎቶ ለመጠቀም File ID እንተካለን)
+    await message.answer(text=welcome_text, reply_markup=keyboard)
+
+
+# 💡 ይህ አዲስ ክፍል ፎቶ ስትልክለት የፋይሉን ID አውጥቶ ይሰጥሃል!
+@dp.message(lambda message: message.photo)
+async def get_photo_file_id(message: types.Message):
+    file_id = message.photo[-1].file_id
+    await message.reply(f"📷 የላኩት ፎቶ File ID ይህ ነው፦\n\n<code>{file_id}</code>", parse_mode="HTML")
+
 
 @dp.callback_query(lambda c: c.data.startswith("select_"))
 async def number_selection_handler(callback_query: types.CallbackQuery):
@@ -55,7 +61,6 @@ async def number_selection_handler(callback_query: types.CallbackQuery):
     if chat_id not in active_games:
         active_games[chat_id] = []
         
-    # ተጫዋቹ ከዚህ በፊት መርጦ ከሆነ እንዳይደግም መከላከል
     if any(p["user_id"] == user_id for p in active_games[chat_id]):
         await callback_query.message.answer(f"⚠️ {username} ከዚህ በፊት ቁጥር መርጠዋል። እባክዎ እጣው እስኪወጣ ይጠብቁ!")
         return
@@ -68,18 +73,13 @@ async def number_selection_handler(callback_query: types.CallbackQuery):
         f"📊 የተመዘገቡ ተጫዋቾች፦ {current_players}/10"
     )
     
-    # 10 ተጫዋቾች ሲሞሉ ጨዋታውን በራሱ እንዲጀምር ማድረግ
     if current_players >= 10:
         await start_spinning_effect(callback_query.message, chat_id)
 
 async def start_spinning_effect(message: types.Message, chat_id: str):
-    # 1. የሽክርክሪት አኒሜሽን (Motion Blur 3D) ምስል መላክ
-    spinning_msg = await message.answer_photo(
-        photo="https://raw.githubusercontent.com/Mela-Content-Bot/assets/main/wheel_spin.jpg",
-        caption="⚡ መንኮራኩሩ በከፍተኛ ፍጥነት እየተሽከረከረ ነው! አሸናፊው ማን ይሆን?..."
-    )
+    spinning_msg = await message.answer("⚡ መንኮራኩሩ በከፍተኛ ፍጥነት እየተሽከረከረ ነው! አሸናፊው ማን ይሆን?...")
     
-    await asyncio.sleep(5)  # ለ 5 ሰከንድ እንዲሽከረከር ማድረግ
+    await asyncio.sleep(5)
     
     winner_number = str(random.randint(1, 10))
     players = active_games[chat_id]
@@ -108,13 +108,7 @@ async def start_spinning_effect(message: types.Message, chat_id: str):
     ])
     
     await spinning_msg.delete()
-    # 3. የመጨረሻውን የ3D አሸናፊ ምስል መላክ
-    await message.answer_photo(
-        photo="https://raw.githubusercontent.com/Mela-Content-Bot/assets/main/wheel_winner.jpg",
-        caption=result_text,
-        parse_mode="HTML",
-        reply_markup=inline_claim if winner_user else None
-    )
+    await message.answer(text=result_text, parse_mode="HTML", reply_markup=inline_claim if winner_user else None)
     
     active_games[chat_id] = []
 
