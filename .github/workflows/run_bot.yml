@@ -1,0 +1,33 @@
+name: 🎰 የዕድል መንኮራኩር ቦት አውቶሜሽን
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  schedule:
+    # ቦቱ ሳይቋረጥ እንዲሰራ በየ 5 ሰዓቱ በራሱ Workflowውን ይቀሰቅሰዋል
+    - cron: '0 */5 * * *'
+  workflow_dispatch: # በራስህ ፍላጎት በማንኛውም ጊዜ በቁልፍ ለማስጀመር
+
+jobs:
+  run-telegram-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 ኮዱን መውሰድ (Checkout Code)
+      uses: actions/checkout@v4
+
+    - name: 🐍 ፓይተንን ማዘጋጀት (Set up Python)
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: 📦 ላይብረሪዎችን መጫን (Install Dependencies)
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+    - name: 🚀 ቦቱን ማንቀሳቀስ (Run Bot)
+      env:
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }} 
+      run: |
+        python bot.py
