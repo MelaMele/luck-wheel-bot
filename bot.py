@@ -6,10 +6,7 @@ import sys
 import os
 
 # 🔒 ቶክኑን ከ GitHub Secrets በምስጢር መጥራት
-TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-if not TOKEN:
-    print("❌ ስህተት፦ TELEGRAM_BOT_TOKEN በ GitHub Secrets ውስጥ አልተገኘም!")
-    sys.exit(1)
+TOKEN = "8627859146:AAGhkOEo6IgRljqrBveGdJextuoOs1DMSPU"
 
 bot = telebot.TeleBot(TOKEN)
 
