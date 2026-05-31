@@ -7,120 +7,97 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1e1e2f, #252542);
-            color: white;
-            text-align: center;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            overflow: hidden;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #161623);
+            color: white; text-align: center; margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; overflow: hidden;
         }
-        h1 { font-size: 24px; margin-bottom: 20px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-        .wheel-container { position: relative; width: 300px; height: 300px; }
+        h1 { font-size: 22px; margin-bottom: 10px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .wheel-container { position: relative; width: 280px; height: 280px; margin-top: 20px; }
         .pointer {
-            position: absolute;
-            top: -15px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 0; height: 0;
-            border-left: 15px solid transparent;
-            border-right: 15px solid transparent;
-            border-top: 30px solid #ff4757;
-            z-index: 10;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+            position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+            width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent;
+            border-top: 25px solid #ff4757; z-index: 10; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
         }
         canvas {
-            width: 100%; height: 100%;
-            border-radius: 50%;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            transition: transform 4s cubic-bezier(0.1, 0.8, 0.25, 1);
+            width: 100%; height: 100%; border-radius: 50%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            transition: transform 10s cubic-bezier(0.25, 0.1, 0.1, 1);
         }
-        button {
-            margin-top: 30px;
-            padding: 12px 35px;
-            font-size: 18px;
-            font-weight: bold;
-            background: linear-gradient(45deg, #ff4757, #ff6b81);
-            color: white; border: none; border-radius: 25px;
-            cursor: pointer; box-shadow: 0 5px 15px rgba(255, 71, 87, 0.4);
-            transition: 0.2s;
-        }
-        button:active { transform: scale(0.95); }
+        #status { margin-top: 25px; font-size: 18px; font-weight: bold; color: #ffa502; }
     </style>
 </head>
 <body>
 
-    <h1>🎡 የዕድል እሽክርክሪት 🎡</h1>
+    <h1>🎡 የዕድል እሽክርክሪት (ቀጥታ ስርጭት) 🎡</h1>
+    <div id="status">እሽክርክሪቱ እየተዘጋጀ ነው... ⏳</div>
     
     <div class="wheel-container">
         <div class="pointer"></div>
         <canvas id="wheel" width="300" height="300"></canvas>
     </div>
 
-    <button id="spinBtn" onclick="spinWheel()">አሽከርክር! 🔄</button>
-
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand(); // ገጹን ሙሉ ስክሪን ያደርገዋል
+        tg.expand();
 
         const canvas = document.getElementById('wheel');
         const ctx = canvas.getContext('2d');
-        const prizes = ["50 ነጥብ", "100 ነጥብ", "500 ነጥብ", "0 ነጥብ", "ታላቅ ሽልማት", "ድጋሚ ሞክር"];
-        const colors = ["#ff4757", "#2ed573", "#1e90ff", "#ffa502", "#9b59b6", "#34495e"];
+        
+        // ከ1 እስከ 10 ያሉት ቁጥሮች በእሽክርክሪቱ ላይ
+        const prizes = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
+        const colors = ["#ff4757", "#2ed573", "#1e90ff", "#ffa502", "#9b59b6", "#34495e", "#eccc68", "#ff6b81", "#70a1ff", "#2bcbba"];
         
         const size = prizes.length;
         const arc = Math.PI / (size / 2);
-        let currentRotation = 0;
 
-        // እሽክርክሪቱን መሳል
         function drawWheel() {
             for (let i = 0; i < size; i++) {
                 ctx.fillStyle = colors[i];
-                ctx.beginPath();
-                ctx.moveTo(150, 150);
+                ctx.beginPath(); ctx.moveTo(150, 150);
                 ctx.arc(150, 150, 150, i * arc, (i + 1) * arc);
-                ctx.lineTo(150, 150);
-                ctx.fill();
+                ctx.lineTo(150, 150); ctx.fill();
                 
-                // ጽሑፍ ማስገባት
-                ctx.save();
-                ctx.fillStyle = "white";
-                ctx.font = "bold 14px Arial";
-                ctx.translate(150, 150);
-                ctx.rotate(i * arc + arc / 2);
-                ctx.textAlign = "right";
-                ctx.fillText(prizes[i], 130, 5);
+                ctx.save(); ctx.fillStyle = "white"; ctx.font = "bold 16px Arial";
+                ctx.translate(150, 150); ctx.rotate(i * arc + arc / 2);
+                ctx.textAlign = "right"; ctx.fillText(prizes[i], 130, 5);
                 ctx.restore();
             }
         }
-
-        function spinWheel() {
-            document.getElementById('spinBtn').disabled = true;
-            // በዘፈቀደ ዲግሪ ማሽከርከር (ቢያንስ 5 ዙር እንዲዞር)
-            const extraDegrees = Math.floor(Math.random() * 360);
-            const totalRotation = 1800 + extraDegrees; 
-            currentRotation += totalRotation;
-            
-            canvas.style.transform = `rotate(${currentRotation}deg)`;
-
-            // ማሽከርከሩ ሲያበቃ (ከ 4 ሰከንድ በኋላ) ውጤቱን ለቦቱ መላክ
-            setTimeout(() => {
-                const actualDegree = currentRotation % 360;
-                const prizeIndex = Math.floor((360 - actualDegree) / (360 / size)) % size;
-                const finalPrize = prizes[prizeIndex];
-
-                // ውጤቱን በቀጥታ ወደ ቴሌግራም ቦት ይልካል
-                tg.sendData(JSON.stringify({ prize: finalPrize }));
-                tg.close(); // ገጹን ይዘጋዋል
-            }, 4000);
-        }
-
         drawWheel();
+
+        // በሊንኩ የመጣውን አሸናፊ ቁጥር ማንበብ (ለምሳሌ ?winner=5)
+        const urlParams = new URLSearchParams(window.location.search);
+        const winnerNumber = urlParams.get('winner');
+
+        if (winnerNumber) {
+            document.getElementById('status').innerText = "እሽክርክሪቱ እየተሽከረከረ ነው! 🔄";
+            
+            // የትኛው ቁጥር ላይ ማረፍ እንዳለበት በትክክል ዲግሪውን ማስላት
+            const targetIndex = prizes.indexOf(winnerNumber);
+            
+            // 360 ዲግሪ ክፍፍል
+            const degreesPerSegment = 360 / size;
+            // ወደ ኋላ ተገልብጦ ስለምታይ ማስተካከያ
+            const targetDegree = 360 - (targetIndex * degreesPerSegment) - (degreesPerSegment / 2);
+            
+            // 10 ዙር ሙሉ እንዲዞር (3600 ዲግሪ) መደመር
+            const totalRotation = 3600 + targetDegree;
+            
+            // ማሽከርከር መጀመር
+            setTimeout(() => {
+                canvas.style.transform = `rotate(${totalRotation}deg)`;
+            }, 500);
+
+            // ከ10 ሰከንድ በኋላ ጨዋታውን መዝጋት
+            setTimeout(() => {
+                document.getElementById('status').innerHTML = `🎉 የወጣው ቁጥር: <span style="color:#2ed573; font-size:24px;">${winnerNumber}</span> 🎉`;
+                setTimeout(() => { tg.close(); }, 3000); // ውጤቱን ለ3 ሰከንድ አሳይቶ ይዘጋል
+            }, 10500);
+        } else {
+            document.getElementById('status').innerText = "ስህተት፦ አሸናፊው ቁጥር አልተገኘም!";
+        }
     </script>
 </body>
 </html>
