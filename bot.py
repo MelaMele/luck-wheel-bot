@@ -7,7 +7,7 @@ bot = telebot.TeleBot(TOKEN)
 
 # ⚠️ ማሳሰቢያ፦ ይህ የ GitHub ገጽህ አድራሻ ነው። index.html ን GitHub Pages ላይ ካበራኸው በኋላ የሚሰጥህ ሊንክ ነው!
 # ለጊዜው በሙከራ ሊንክ ተክቼዋለሁ፣ ሪፖዚቶሪህን Pages ካደረግከው በኋላ በራስህ ሊንክ ትተካዋለህ።
-WEB_APP_URL = "https://melamele.github.io/luck-wheel-bot/" 
+WEB_APP_URL = "https://melamele.github.io/luck-wheel-bot//" 
 
 @bot.message_handler(commands=['start', 'spin'])
 def send_game(message):
