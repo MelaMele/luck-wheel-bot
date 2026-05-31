@@ -3,8 +3,14 @@ from telebot import types
 import random
 import time
 import sys
+import os
 
-TOKEN = "8627859146:AAGhkOEo6IgRljqrBveGdJextuoOs1DMSPU"
+# 🔒 ቶክኑን ከ GitHub Secrets በምስጢር መጥራት
+TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+if not TOKEN:
+    print("❌ ስህተት፦ TELEGRAM_BOT_TOKEN በ GitHub Secrets ውስጥ አልተገኘም!")
+    sys.exit(1)
+
 bot = telebot.TeleBot(TOKEN)
 
 WEB_APP_URL = "https://MelaMele.github.io/luck-wheel-bot/"
@@ -28,7 +34,6 @@ def welcome_game(message):
     )
     
     markup = types.InlineKeyboardMarkup(row_width=5)
-    # ማስተካከያ፦ እያንዳንዱ ቁልፍ 'select_ቁጥር' የሚል ዳታ እንዲልክ ተደርጓል
     buttons = [types.InlineKeyboardButton(text=f"{i}", callback_data=f"select_{i}") for i in range(1, 11)]
     markup.add(*buttons)
     
@@ -36,23 +41,19 @@ def welcome_game(message):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("select_"))
 def handle_number_selection(call):
-    chat_id = call.message.chat.id
+    chat_id = message.chat.id if 'message' in dir(call) else call.from_user.id
     selected_num = call.data.split("_")[1]
     
     if str(chat_id) in GAME_POOL["active_players"]:
         bot.answer_callback_query(call.id, text="በዚህ ዙር ቀድመው ቁጥር መርጠዋል! ⏳", show_alert=True)
         return
 
-    # ተጫዋቹን መመዝገብ
     GAME_POOL["active_players"][str(chat_id)] = selected_num
     current_count = len(GAME_POOL["active_players"])
     
     bot.answer_callback_query(call.id, text=f"ቁጥር {selected_num} በተሳካ ሁኔታ ተመርጧል! ✅")
-    
-    # ለተጫዋቹ ማረጋገጫ በጽሑፍ መላክ
     bot.send_message(chat_id, f"🎯 ቁጥር **{selected_num}** መግባትዎ ተመዝግቧል። አጠቃላይ ተጫዋቾች፦ **{current_count}/10**", parse_mode="Markdown")
 
-    # 10 ተጫዋች ሲሞላ ዕጣ ማውጣት
     if current_count >= GAME_POOL["max_players"]:
         run_automatic_draw()
 
@@ -97,6 +98,11 @@ def run_automatic_draw():
     GAME_POOL["active_players"] = {}
 
 if __name__ == "__main__":
-    print("🎯 ቢዝነስ ቦቱ በተሳካ ሁኔታ ተነስቷል...")
+    print("🎯 የድሮ ግንኙነቶችን በማጽዳት ላይ...")
+    sys.stdout.flush()
+    bot.remove_webhook()
+    time.sleep(1)
+    
+    print("🎯 ቢዝነስ ቦቱ በምስጢር አወቃቀር በተሳካ ሁኔታ ተነስቷል...")
     sys.stdout.flush()
     bot.infinity_polling()
