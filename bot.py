@@ -5,17 +5,20 @@ import time
 import sys
 import os
 
-# 🔒 ቶክኑን ከ GitHub Secrets በምስጢር መጥራት
-TOKEN = "8627859146:AAGhkOEo6IgRljqrBveGdJextuoOs1DMSPU"
+# 🔒 1. መጀመሪያ ከ GitHub Secrets ለመውሰድ ይሞክራል
+TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+
+# ⚠️ 2. ከላይ ካጣው፣ እዚህ ጋ ያንተን ቶክን እንደ ባካፕ እንዲጠቀም ቀጥታ እንሰጠዋለን
+if not TOKEN or TOKEN == "":
+    TOKEN = "8627859146:AAGhkOEo6IgRljqrBveGdJextuoOs1DMSPU"
 
 bot = telebot.TeleBot(TOKEN)
 
-# የ GitHub Pages ሊንክህ
-WEB_APP_URL = "https://MelaMele.github.io/luck-wheel-bot/"
+# የ GitHub Pages ሊንክህ (ውጤቱን በ URL Parameter የሚቀበለው)
+BASE_WEB_URL = "https://MelaMele.github.io/luck-wheel-bot/"
 
-# የጨዋታው ገንዳ (Pool) መቆጣጠሪያ
 GAME_POOL = {
-    "active_players": {},  # {str(chat_id): selected_number}
+    "active_players": {}, 
     "ticket_price": 30,
     "max_players": 10
 }
@@ -43,78 +46,79 @@ def handle_number_selection(call):
     chat_id = call.message.chat.id
     selected_num = call.data.split("_")[1]
     
-    # ተጫዋቹ ቀድሞ መሳተፉን ማረጋገጥ
     if str(chat_id) in GAME_POOL["active_players"]:
         bot.answer_callback_query(call.id, text="በዚህ ዙር ቀድመው ቁጥር መርጠዋል! ⏳", show_alert=True)
         return
 
-    # ተጫዋቹን እና የመረጠውን ቁጥር መመዝገብ
     GAME_POOL["active_players"][str(chat_id)] = selected_num
     current_count = len(GAME_POOL["active_players"])
     
-    bot.answer_callback_query(call.id, text=f"ቁጥር {selected_num} በተሳካ ሁኔታ ተመርጧል! ✅")
-    
-    # ለተጫዋቹ በጽሑፍ ማረጋገጫ መላክ
+    bot.answer_callback_query(call.id, text=f"ቁጥር {selected_num} ተመርጧል! ✅")
     bot.send_message(chat_id, f"🎯 ቁጥር **{selected_num}** መግባትዎ ተመዝግቧል። አጠቃላይ ተጫዋቾች፦ **{current_count}/10**", parse_mode="Markdown")
 
-    # 10 ተጫዋች ሲሞላ አውቶማቲክ እጣ ማውጣት
     if current_count >= GAME_POOL["max_players"]:
-        # ቦቱ መልእክት ልኮ እስኪያበቃ ድረስ ከበስተጀርባ (Thread) እንዲሰራ ማድረግ ይመረጣል፡ ግን ለጊዜው ቀጥታ እንጥራው
         run_automatic_draw()
 
 def run_automatic_draw():
-    players = GAME_POOL["active_players"].copy() # ሩጫዎችን ለመከላከል ኮፒ እንውሰድ
+    players = GAME_POOL["active_players"].copy()
     
-    # 1. ለሁሉም ተጫዋቾች የዌብ አፕሊኬሽን ሊንክ መላክ
+    # አሸናፊውን ቁጥር እዚህ መምረጥ
+    winning_number = str(random.randint(1, 10))
+    
+    # 🔗 አሸናፊውን ቁጥር በሊንክ Parameters አያይዞ መላክ (URL Parameter Strategy)
+    game_url_with_winner = f"{BASE_WEB_URL}?winner={winning_number}"
+    
     for player_id in players.keys():
         try:
             markup = types.InlineKeyboardMarkup()
-            # ዌብ አፑን የሚከፍት ትክክለኛ መዋቅር
-            web_app_info = types.WebAppInfo(url=WEB_APP_URL)
+            web_app_info = types.WebAppInfo(url=game_url_with_winner)
             btn = types.InlineKeyboardButton(text="ቀጥታ ስርጭት እሽክርክሪቱን እይ 🎡", web_app=web_app_info)
             markup.add(btn)
             bot.send_message(int(player_id), "🚨 **10 ተጫዋቾች ሞልተዋል! እሽክርክሪቱ መዞር ጀምሯል!** 🚨\nከታች ያለውን ቁልፍ ተጭነው ጨዋታውን በቀጥታ ይከታተሉ!", reply_markup=markup)
         except Exception as e:
-            print(f"ስህተት ለመልእክት {player_id}: {e}")
+            print(f"ስህተት ለ {player_id}: {e}")
             
-    # 2. የ 10 ሰከንድ የእሽክርክሪት ጊዜ መጠበቅ
+    # የ10 ሰከንድ የእሽክርክሪት ጊዜ መጠበቂያ
     time.sleep(10)
     
-    # 3. አሸናፊውን መምረጥ
-    winner_id = random.choice(list(players.keys()))
-    winner_number = players[winner_id]
+    winners = [pid for pid, num in players.items() if num == winning_number]
     
-    # 4. የገንዘብ ስሌት
     total_pool = 10 * 30
     winner_share = int(total_pool * 0.80)
     our_share = int(total_pool * 0.20)
     
-    result_text = (
-        "🎉 **የዕጣው ውጤት በይፋ ወጥቷል!** 🎉\n\n"
-        f"🎯 የወጣው ባለዕጣ ቁጥር፦ **{winner_number}**\n"
-        f"👑 አሸናፊ ተጫዋች (ID)፦ `{winner_id}`\n\n"
-        f"💰 ጠቅላላ የተሰበሰበ ገንዳ፦ **{total_pool} ብር**\n"
-        f"🎁 ለአሸናፊው የሚከፈል (80%)፦ **{winner_share} ብር**\n"
-        f"💼 የባለቤት ድርሻ/ኮሚሽን (20%)፦ **{our_share} ብር**\n\n"
-        "አዲስ ዙር አሁን ተከፍቷል! ለመሳተፍ ድጋሚ /game ወይም /start ይበሉ!"
-    )
+    if winners:
+        share_per_winner = winner_share // len(winners)
+        winners_text = ", ".join([f"`{w}`" for w in winners])
+        result_text = (
+            "🎉 **የዕጣው ውጤት በይፋ ወጥቷል!** 🎉\n\n"
+            f"🎯 የወጣው ባለዕጣ ቁጥር፦ **{winning_number}**\n"
+            f"👑 አሸናፊ(ዎች)፦ {winners_text}\n\n"
+            f"💰 ጠቅላላ ገንዳ፦ **{total_pool} ብር**\n"
+            f"🎁 ለአሸናፊ(ዎች) የተላከ (80%)፦ **{winner_share} ብር** ({share_per_winner} ብር ለእያንዳንዳቸው)\n"
+            f"💼 የባለቤት ድርሻ (20%)፦ **{our_share} ብር**\n\n"
+            "አዲስ ዙር ተከፍቷል! ለመሳተፍ ድጋሚ /start ይበሉ!"
+        )
+    else:
+        result_text = (
+            "🎉 **የዕጣው ውጤት በይፋ ወጥቷል!** 🎉\n\n"
+            f"🎯 የወጣው ባለዕጣ ቁጥር፦ **{winning_number}**\n"
+            "🎰 ያሳዝናል! በዚህ ዙር ይህንን ቁጥር የመረጠ ተጫዋች የለም።\n\n"
+            f"💰 ጠቅላላ ገንዳው (**{total_pool} ብር**) ለሚቀጥለው ዙር ተላልፏል! 🚀\n\n"
+            "አዲስ ዙር ተከፍቷል! ለመሳተፍ ድጋሚ /start ይበሉ!"
+        )
     
-    # 5. ውጤቱን ለሁሉም ማሰራጨት
     for player_id in players.keys():
         try:
             bot.send_message(int(player_id), result_text, parse_mode="Markdown")
         except:
             pass
             
-    # 6. ገንዳውን ለቀጣዩ ዙር ማጽዳት
     GAME_POOL["active_players"] = {}
 
 if __name__ == "__main__":
-    print("🎯 የድሮ ግንኙነቶችን በማጽዳት ላይ...")
     sys.stdout.flush()
     bot.remove_webhook()
     time.sleep(1)
-    
-    print("🎯 ቢዝነስ ቦቱ በምስጢር አወቃቀር በተሳካ ሁኔታ ተነስቷል...")
-    sys.stdout.flush()
+    print("🎯 ቢዝነስ ቦቱ በሁለቱ አሰላለፍ በተሳካ ሁኔታ ተነስቷል...")
     bot.infinity_polling()
