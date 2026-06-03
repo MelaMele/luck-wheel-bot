@@ -7,13 +7,14 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# 🔐 ያንተ መረጃዎች
+# 🔐 ያንተ መረጃዎች እዚህ ጋ በትክክል ገብተዋል
 ADMIN_CHAT_ID = 1065443252  
 TELEBIRR_NUMBER = "+251913064239" 
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
+# የጨዋታ መረጃዎች ማከማቻ
 active_games = {} 
 pending_payments = {} 
 
@@ -24,7 +25,7 @@ async def start_handler(message: types.Message):
         active_games[chat_id] = {}
 
     welcome_text = (
-        "🎡 <b>እንኳን ወደ ሕዝባዊ የዕድል እሽከርክሪት መድረክ መጡ!</b> 🎡\n\n"
+        "🎡 እንኳን ወደ ሕዝባዊ የዕድል እሽከርክሪት መድረክ መጡ! 🎡\n\n"
         "💵 የትኬት ዋጋ፦ <b>30 ብር</b>\n"
         f"👥 አሁን የተሸጡ ትኬቶች፦ <b>{len(active_games[chat_id])}/10</b>\n\n"
         "ከ1 እስከ 10 ያለውን የዕድል ቁጥርዎን በመምረጥ ይሳተፉ፦"
@@ -57,7 +58,6 @@ async def buy_number_handler(callback_query: types.CallbackQuery):
     chat_id = callback_query.message.chat.id
     
     if user_id in pending_payments:
-        # እዚህ ጋ መልዕክቱን ወደ አማርኛ ቀይረነዋል
         await callback_query.answer("⚠️ ቀደም ሲል የላኩት ክፍያ ማረጋገጫ እየታየ ነው! እባክዎ ይጠብቁ።", show_alert=True)
         return
 
@@ -90,13 +90,14 @@ async def screenshot_receiver(message: types.Message):
     user_id = message.from_user.id
     
     if user_id not in pending_payments:
-        await message.reply("⚠️ <b>እባክዎ መጀመሪያ ከላይ ቁጥር ይምረጡ፤ ከዚያ የክፍያ ስክሪንሾት ይላኩ።</b>", parse_mode="HTML")
+        await message.reply("⚠️ እባክዎ መጀመሪያ ከላይ ቁጥር ይምረጡ፤ ከዚያ የክፍያ ስክሪንሾት ይላኩ።")
         return
         
     user_data = pending_payments[user_id]
     selected_num = user_data["num"]
+    chat_id = user_data["chat_id"]
     
-    await message.reply("📥 <b>የክፍያ ስክሪንሾትዎ ደርሶናል። በአስተዳዳሪው ተረጋግጦ ቁጥሩ እስኪመዘገብ እባክዎ በትዕግስት ይጠብቁ!</b>", parse_mode="HTML")
+    await message.reply("📥 የክፍያ ስክሪንሾትዎ ደርሶናል። በአስተዳዳሪው ተረጋግጦ ቁጥሩ እስኪመዘገብ እባክዎ በትዕግስት ይጠብቁ!")
     
     admin_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -130,18 +131,15 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
         
     active_games[chat_id][selected_num] = {"user_id": target_user_id, "name": user_data["name"]}
     
-    # parse_mode="HTML" እዚህ ላይ ተጨምሯል (የታግ ስህተቱን ለመፍታት)
     await bot.send_message(
         chat_id=target_user_id,
-        text=f"🎉 <b>ክፍያዎ ተረጋግጧል!</b>\n🔢 <b>ቁጥር {selected_num}</b> በትክክል ለእርስዎ ተመዝግቧል። መልካም ዕድል!",
-        parse_mode="HTML"
+        text=f"🎉 <b>ክፍያዎ ተረጋግጧል!</b>\n🔢 <b>ቁጥር {selected_num}</b> በትክክል ለእርስዎ ተመዝግቧል። መልካም ዕድል!"
     )
     
     current_count = len(active_games[chat_id])
     await bot.send_message(
         chat_id=chat_id,
-        text=f"👤 <b>{user_data['name']}</b> ቁጥር <b>{selected_num}</b>ን በ30 ብር ገዝቷል።\n📊 የተሸጡ ትኬቶች፦ <b>{current_count}/10</b>",
-        parse_mode="HTML"
+        text=f"👤 <b>{user_data['name']}</b> ቁጥር <b>{selected_num}</b>ን በ30 ብር ገዝቷል።\n📊 የተሸጡ ትኬቶች፦ <b>{current_count}/10</b>"
     )
     
     del pending_payments[target_user_id]
@@ -160,19 +158,19 @@ async def admin_reject_handler(callback_query: types.CallbackQuery):
         
     await bot.send_message(
         chat_id=target_user_id,
-        text="❌ <b>ክፍያዎ ውድቅ ተደርጓል!</b>\nየላኩት ስክሪንሾት ትክክለኛ አይደለም ወይም ክፍያው አልደረሰንም። እባክዎ እንደገና በትክክል ይክፈሉ ወይም አስተዳዳሪውን ያነጋግሩ።",
-        parse_mode="HTML"
+        text="❌ <b>ክፍያዎ ውድቅ ተደርጓል!</b>\nየላኩት ስክሪንሾት ትክክለኛ አይደለም ወይም ክፍያው አልደረሰንም። እባክዎ እንደገና በትክክል ይክፈሉ ወይም አስተዳዳሪውን ያነጋግሩ።"
     )
     
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption="❌ ይህ ክፍያ ውድቅ ተደርጓል።", reply_markup=None)
 
 async def start_spinning_effect(message: types.Message, chat_id: int):
-    spinning_msg = await bot.send_message(chat_id=chat_id, text="🔄 <b>10 ትኬቶች ሙሉ በሙሉ ተሽጠዋል! እጣው ሊወጣ 3 ሰከንድ ቀረው...</b>", parse_mode="HTML")
+    # 🎰 እውነተኛነትን ለመጨመር በየሰከንዱ የሚቀያየር የበይነገጽ አኒሜሽን
+    spinning_msg = await bot.send_message(chat_id=chat_id, text="🔄 10 ትኬቶች ሙሉ በሙሉ ተሽጠዋል! እጣው ሊወጣ 3 ሰከንድ ቀረው...")
     await asyncio.sleep(1)
-    await spinning_msg.edit_text("⚡ <b>መንኮራኩሩ በከፍተኛ ፍጥነት እየተሽከረከረ ነው... [ 🔄 SPINNING ]</b>", parse_mode="HTML")
+    await spinning_msg.edit_text("⚡ መንኮራኩሩ በከፍተኛ ፍጥነት እየተሽከረከረ ነው... [ 🔄 SPINNING ]")
     await asyncio.sleep(1.5)
-    await spinning_msg.edit_text("🎯 <b>ወደ ማጠናቀቂያው እየተቃረበ ነው... አሸናፊው ቁጥር ሊታወቅ ነው!...</b>", parse_mode="HTML")
+    await spinning_msg.edit_text("🎯 ወደ ማጠናቀቂያው እየተቃረበ ነው... አሸናፊው ቁጥር ሊታወቅ ነው!...")
     await asyncio.sleep(1.5)
     
     winner_number = str(random.randint(1, 10))
