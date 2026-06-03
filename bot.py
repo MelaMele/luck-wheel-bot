@@ -19,7 +19,7 @@ active_games = {}     # በየቦታው የተሸጡ ቁጥሮች {"chat_id": {"
 pending_payments = {} # ማረጋገጫ የሚጠብቁ {"user_id": {"chat_id":..., "num":..., "main_msg_id":...}}
 
 def generate_keyboard(chat_id):
-    """የቁጥሮችን ሰሌዳ አሁን ባለው ሁኔታ አዘጋጅቶ የሚመልስ"""
+    """የቁጥሮችን ሰሌዳ አሁን ባለው ሁኔታ አዘጋጅቶ የሚመልስ ተግባር"""
     game = active_games.get(chat_id, {})
     buttons = []
     row = []
@@ -45,7 +45,7 @@ async def start_handler(message: types.Message):
     if chat_id not in active_games:
         active_games[chat_id] = {}
 
-    # 🎯 መጫወቻ ሜዳው ሁልጊዜም መጀመሪያ እዚህ ጋ ይነበባል!
+    # 🎯 መጫወቻ ሜዳው መጀመሪያ እዚህ ጋ በግልጽ ይወጣል!
     welcome_text = (
         "🎡 <b>እንኳን ወደ ዕድል እሽከርክሪት መድረክ በሰላም መጡ!</b> 🎡\n\n"
         "💵 የትኬት ዋጋ፦ <b>30 ብር</b>\n"
@@ -69,7 +69,7 @@ async def buy_number_handler(callback_query: types.CallbackQuery):
 
     await callback_query.answer()
     
-    # 💳 የክፍያ መመሪያው በተጫዋቹ ስክሪን ላይ በግልጽ ይወጣል
+    # 💳 የክፍያ መመሪያው በተጫዋቹ ስክሪን ላይ ይወጣል
     payment_instruction = (
         f"🎯 <b>ቁጥር {selected_num}ን መርጠዋል!</b>\n\n"
         f"💰 እባክዎ <b>30 ብር</b> በቴሌብር (Telebirr) በሚከተለው ስልክ ቁጥር ይላኩ፦\n"
@@ -121,7 +121,7 @@ async def screenshot_receiver(message: types.Message):
         parse_mode="HTML"
     )
 
-# ✅ አድሚኑ ሲያጸድቅ
+# ✅ አድሚኑ ሲያጸድቅ (ደህንነቱ የተጠበቀ - ያንተን ID ብቻ ነው የሚሰማው)
 @dp.callback_query(F.data.startswith("adm_ap_"))
 async def admin_approve_handler(callback_query: types.CallbackQuery):
     if callback_query.from_user.id != ADMIN_CHAT_ID:
@@ -146,7 +146,7 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
     # ለተጫዋቹ ማሳወቅ
     await bot.send_message(chat_id=target_user_id, text=f"🎉 <b>ክፍያዎ ተረጋግጧል!</b>\n🔢 <b>ቁጥር {selected_num}</b> ለእርስዎ በትክክል ተመዝግቧል። መልካም ዕድል!", parse_mode="HTML")
     
-    # በጨዋታው ሜዳ (ግሩፕ ወይም ቻት) ላይ ማሳወቅ
+    # በጨዋታው ሜዳ ላይ ማሳወቅ
     current_count = len(active_games[chat_id])
     await bot.send_message(
         chat_id=chat_id,
@@ -175,6 +175,7 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption=f"✅ ተፈቅዷል! ቁጥር {selected_num} ተመዝግቧል።", reply_markup=None)
     
+    # 🎲 10 ሰው ሙሉ በሙሉ ሲሞላ እጣውን በራስ-ሰር ማሽከርከር
     if current_count >= 10:
         await start_spinning_effect(chat_id, user_data["main_msg_id"])
 
@@ -196,28 +197,48 @@ async def admin_reject_handler(callback_query: types.CallbackQuery):
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption="❌ ይህ ክፍያ ውድቅ ተደርጓል።", reply_markup=None)
 
+# 🎰 እውነተኛው የሚሽከረከር የዕጣ አወጣጥ ክፍል
 async def start_spinning_effect(chat_id: int, main_msg_id: int):
-    spinning_msg = await bot.send_message(chat_id=chat_id, text="🔄 <b>10 ትኬቶች ተሽጠዋል! እጣው ሊወጣ 3 ሰከንድ ቀረው...</b>", parse_mode="HTML")
-    await asyncio.sleep(1)
-    await spinning_msg.edit_text("⚡ <b>መንኮራኩሩ በከፍተኛ ፍጥነት እየተሽከረከረ ነው... [ 🔄 SPINNING ]</b>", parse_mode="HTML")
-    await asyncio.sleep(1.5)
+    announcement = await bot.send_message(
+        chat_id=chat_id, 
+        text="🚨 <b>10ቱም ትኬቶች በሙሉ ተሽጠዋል! የዕድል መንኮራኩሩ አሁን ይሽከረከራል...</b> 🚨", 
+        parse_mode="HTML"
+    )
+    await asyncio.sleep(2)
     
-    winner_number = str(random.randint(1, 10))
+    # 🎰 የቴሌግራምን እውነተኛ የሚሽከረከር Slot Machine አኒሜሽን መላክ
+    dice_msg = await bot.send_dice(chat_id=chat_id, emoji="🎰")
+    dice_value = dice_msg.dice.value # ከቴሌግራም አገልጋይ የሚመጣ የዘፈቀደ ቁጥር
+    
+    # አኒሜሽኑ ተሽከርክሮ እስኪያልቅ 4 ሰከንድ መታገስ
+    await asyncio.sleep(4)
+    
+    # ከዳይሱ ውጤት ላይ ከ 1 እስከ 10 ያለውን አሸናፊ ቁጥር ቀምሮ ማውጣት
+    winner_number = str((dice_value % 10) + 1)
+    
     players = active_games[chat_id]
     winner_user = players.get(winner_number)
     
     if winner_user:
         result_text = (
-            f"🎉 <b>ዕጣው በይፋ ወጥቷል! እንኳን ደስ አሎት!</b> 🎉\n\n"
-            f"🎯 የወጣው አሸናፊ ቁጥር፦ <b>ቁጥር {winner_number}</b>\n"
-            f"👑 ሻምፒዮን፦ <a href='tg://user?id={winner_user['user_id']}'>{winner_user['name']}</a>\n\n"
-            f"💰 የ 200 ብር ሽልማትዎን ለመቀበል አድሚኑን ያነጋግሩ!"
+            f"🎯 <b>የዕድል እሽከርክሪቱ ቆሟል!</b>\n"
+            f"🎰 የዕጣው ውጤት ቁጥር፦ <b>ቁጥር {winner_number}</b>\n\n"
+            f"🎉🎉 <b>እንኳን ደስ አሎት!</b> 🎉🎉\n"
+            f"👑 የዚህ ዙር ሻምፒዮን፦ <a href='tg://user?id={winner_user['user_id']}'>{winner_user['name']}</a>\n\n"
+            f"💰 <b>የ 200 ብር</b> ሽልማትዎን ለመቀበል አሁኑኑ ለአስተዳዳሪው መልዕክት ይላኩ!"
         )
     else:
-        result_text = f"🎯 የወጣው ቁጥር፦ <b>ቁጥር {winner_number}</b> ነበር።\n😔 ይህንን ቁጥር ማንም ስላልገዛው ገንዘቡ ለሚቀጥለው ዙር ይተላለፋል!"
+        result_text = (
+            f"🎯 <b>የዕድል እሽከርክሪቱ ቆሟል!</b>\n"
+            f"🎰 የዕጣው ውጤት ቁጥር፦ <b>ቁጥር {winner_number}</b>\n\n"
+            f"😔 <b>የሚገርም ነው!</b> ይህንን ቁጥር ማንም ስላልገዛው በዚህ ዙር አሸናፊ የለም።\n"
+            f"💰 የተሰበሰበው ገንዘብ በቀጥታ ወደ ሚቀጥለው ዙር ተላልፏል! አዲስ ዙር ለመጀመር /start ይበሉ።"
+        )
         
-    await spinning_msg.delete()
+    await announcement.delete() 
     await bot.send_message(chat_id=chat_id, text=result_text, parse_mode="HTML")
+    
+    # ጨዋታውን ለሚቀጥለው አዲስ ዙር ዳግም ባዶ ማድረግ
     active_games[chat_id] = {}
 
 async def main():
