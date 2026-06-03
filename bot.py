@@ -14,12 +14,12 @@ TELEBIRR_NUMBER = "+251913064239"
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# የውስጥ ዳታቤዝ (ማከማቻ)
-active_games = {}     # በየግሩፑ የተሸጡ ቁጥሮች {"chat_id": {"1": {"user_id":..., "name":...}}}
+# የውስጥ ማከማቻ
+active_games = {}     # በየቦታው የተሸጡ ቁጥሮች {"chat_id": {"1": {"user_id":..., "name":...}}}
 pending_payments = {} # ማረጋገጫ የሚጠብቁ {"user_id": {"chat_id":..., "num":..., "main_msg_id":...}}
 
 def generate_keyboard(chat_id):
-    """የቁጥሮችን ሰሌዳ ወቅታዊ ሁኔታ አይቶ የሚያዘጋጅ ተግባር"""
+    """የቁጥሮችን ሰሌዳ አሁን ባለው ሁኔታ አዘጋጅቶ የሚመልስ"""
     game = active_games.get(chat_id, {})
     buttons = []
     row = []
@@ -30,7 +30,7 @@ def generate_keyboard(chat_id):
             callback_data = f"already_sold_{i}"
         else:
             text = f"🔢 {i}"
-            callback_data = f"buy_{i}_{chat_id}" # የትኛው ግሩፕ እንደሆነ መለየት
+            callback_data = f"buy_{i}_{chat_id}"
             
         row.append(InlineKeyboardButton(text=text, callback_data=callback_data))
         if i % 2 == 0: 
@@ -42,19 +42,12 @@ def generate_keyboard(chat_id):
 async def start_handler(message: types.Message):
     chat_id = message.chat.id
     
-    # ቦቱ በግል መስመር (Private) ከተከፈተ የመቀበያ መልዕክት
-    if message.chat.type == "private":
-        await message.answer(
-            "👋 ሰላም! ይህ የዕድል እሽከርክሪት የክፍያ ማረጋገጫ መቀበያ ክፍል ነው።\n"
-            "እባክዎ መጀመሪያ ጨዋታው ባለበት የቴሌግራም ግሩፕ ውስጥ ቁጥር ይምረጡ።"
-        )
-        return
-
     if chat_id not in active_games:
         active_games[chat_id] = {}
 
+    # 🎯 መጫወቻ ሜዳው ሁልጊዜም መጀመሪያ እዚህ ጋ ይነበባል!
     welcome_text = (
-        "🎡 <b>እንኳን ወደ ሕዝባዊ የዕድል እሽከርክሪት መድረክ መጡ!</b> 🎡\n\n"
+        "🎡 <b>እንኳን ወደ ዕድል እሽከርክሪት መድረክ በሰላም መጡ!</b> 🎡\n\n"
         "💵 የትኬት ዋጋ፦ <b>30 ብር</b>\n"
         f"👥 አሁን የተሸጡ ትኬቶች፦ <b>{len(active_games[chat_id])}/10</b>\n\n"
         "ከ1 እስከ 10 ያለውን የዕድል ቁጥርዎን በመምረጥ ይሳተፉ፦"
@@ -66,29 +59,17 @@ async def start_handler(message: types.Message):
 async def buy_number_handler(callback_query: types.CallbackQuery):
     parts = callback_query.data.split("_")
     selected_num = parts[1]
-    chat_id = int(parts[2]) # የጨዋታው ግሩፕ ID
+    chat_id = int(parts[2]) 
     user_id = callback_query.from_user.id
     username = callback_query.from_user.full_name
     
-    # ደህንነት፦ በሂደት ላይ ያለ ክፍያ ካለው መከልከል
     if user_id in pending_payments:
         await callback_query.answer("⚠️ ቀደም ሲል የላኩት ክፍያ ማረጋገጫ በሂደት ላይ ነው! እባክዎ ይጠብቁ።", show_alert=True)
         return
 
-    # ተጫዋቹን ወደ ቦቱ የውስጥ መስመር (Inbox) እንዲሄድ ማሳሰቢያ መስጠት
-    bot_user = await bot.get_me()
-    bot_username = bot_user.username
-    
     await callback_query.answer()
     
-    # በግሩፑ ላይ መመሪያ መላክ
-    await callback_query.message.answer(
-        f"📩 <b>{username}</b>፣ ቁጥር <b>{selected_num}</b>ን ለመግዛት የክፍያ መመሪያውን በቦቱ የውስጥ መስመር ልከናል።\n"
-        f"🔗 <a href='t.me/{bot_username}?start=start'>እዚህ በመጫን ወደ ቦቱ ኢንቦክስ ይሂዱ</a>", 
-        parse_mode="HTML"
-    )
-    
-    # በውስጥ መስመር ለተጫዋቹ መመሪያ መላክ (Inbox)
+    # 💳 የክፍያ መመሪያው በተጫዋቹ ስክሪን ላይ በግልጽ ይወጣል
     payment_instruction = (
         f"🎯 <b>ቁጥር {selected_num}ን መርጠዋል!</b>\n\n"
         f"💰 እባክዎ <b>30 ብር</b> በቴሌብር (Telebirr) በሚከተለው ስልክ ቁጥር ይላኩ፦\n"
@@ -101,32 +82,30 @@ async def buy_number_handler(callback_query: types.CallbackQuery):
         "chat_id": chat_id,
         "num": selected_num,
         "name": username,
-        "main_msg_id": callback_query.message.message_id # ዋናውን የኪቦርድ መልዕክት ID መያዝ
+        "main_msg_id": callback_query.message.message_id 
     }
     
-    try:
-        await bot.send_message(chat_id=user_id, text=payment_instruction, parse_mode="HTML")
-    except Exception:
-        await callback_query.message.answer(f"⚠️ <b>{username}</b> እባክዎ መጀመሪያ ቦቱን ስታርት (Start) ያድርጉት።")
+    await callback_query.message.answer(text=payment_instruction, parse_mode="HTML")
 
 @dp.callback_query(F.data.startswith("already_sold_"))
 async def already_sold_handler(callback_query: types.CallbackQuery):
     await callback_query.answer("❌ ይህ ቁጥር ተሽጧል! እባክዎ ሌላ ቁጥር ይምረጡ።", show_alert=True)
 
-# 📸 ተጫዋቹ በውስጥ መስመር (Inbox) ስክሪንሾት ሲልክ
-@dp.message(F.chat.type == "private", F.photo)
+# 📸 ተጫዋቹ ስክሪንሾት ሲልክ (በውስጥ መስመር ማጽደቂያ)
+@dp.message(F.photo)
 async def screenshot_receiver(message: types.Message):
     user_id = message.from_user.id
     
     if user_id not in pending_payments:
-        await message.reply("⚠️ እባክዎ መጀመሪያ ግሩፕ ውስጥ ገብተው ቁጥር ይምረጡ።")
+        await message.reply("⚠️ እባክዎ መጀመሪያ ከላይ ቁጥር ይምረጡ፤ ከዚያ የስክሪንሾት ፎቶ ይላኩ።")
         return
         
     user_data = pending_payments[user_id]
+    selected_num = user_data["num"]
     
-    await message.reply("📥 <b>የክፍያ ስክሪንሾትዎ ደርሶናል። በአስተዳዳሪው ተረጋግጦ ቁጥሩ እስኪመዘገብ እባክዎ ይጠብቁ!</b>", parse_mode="HTML")
+    await message.reply("📥 <b>የክፍያ ስክሪንሾትዎ ደርሶናል። በአስተዳዳሪው ተረጋግጦ ቁጥሩ እስኪመዘገብ እባክዎ በትዕግስት ይጠብቁ!</b>", parse_mode="HTML")
     
-    # ለአድሚኑ (ላንተ) በግል ብቻ ማረጋገጫ መላክ
+    # 🔐 ለአድሚኑ (ላንተ) ብቻ በውስጥ መስመር የሚመጣ ማጽደቂያ ቁልፍ
     admin_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="✅ አጽድቅ (Approve)", callback_data=f"adm_ap_{user_id}"),
@@ -137,15 +116,14 @@ async def screenshot_receiver(message: types.Message):
     await bot.send_photo(
         chat_id=ADMIN_CHAT_ID,
         photo=message.photo[-1].file_id,
-        caption=f"🔔 <b>አዲስ የክፍያ ማረጋገጫ!</b>\n\n👤 ተጫዋች፦ {user_data['name']}\n🔢 ቁጥር፦ <b>ቁጥር {user_data['num']}</b>",
+        caption=f"🔔 <b>አዲስ የክፍያ ማረጋገጫ!</b>\n\n👤 ተጫዋች፦ {user_data['name']}\n🔢 ቁጥር፦ <b>ቁጥር {selected_num}</b>",
         reply_markup=admin_keyboard,
         parse_mode="HTML"
     )
 
-# ✅ አድሚኑ ማረጋገጫ ሲጫን (ደህንነቱ የተጠበቀ)
+# ✅ አድሚኑ ሲያጸድቅ
 @dp.callback_query(F.data.startswith("adm_ap_"))
 async def admin_approve_handler(callback_query: types.CallbackQuery):
-    # ደህንነት ማረጋገጫ፦ አድሚኑ ካልሆነ መከልከል
     if callback_query.from_user.id != ADMIN_CHAT_ID:
         await callback_query.answer("❌ ይህ ትዕዛዝ ለአስተዳዳሪው ብቻ የተፈቀደ ነው!", show_alert=True)
         return
@@ -163,24 +141,23 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
     if chat_id not in active_games:
         active_games[chat_id] = {}
         
-    # ቁጥሩን በቋሚነት መመዝገብ
     active_games[chat_id][selected_num] = {"user_id": target_user_id, "name": user_data["name"]}
     
-    # ለተጫዋቹ በኢንቦክስ ማሳወቅ
-    await bot.send_message(chat_id=target_user_id, text=f"🎉 <b>ክፍያዎ ተረጋግጧል!</b>\n🔢 <b>ቁጥር {selected_num}</b> ለእርስዎ ተመዝግቧል። መልካም ዕድል!", parse_mode="HTML")
+    # ለተጫዋቹ ማሳወቅ
+    await bot.send_message(chat_id=target_user_id, text=f"🎉 <b>ክፍያዎ ተረጋግጧል!</b>\n🔢 <b>ቁጥር {selected_num}</b> ለእርስዎ በትክክል ተመዝግቧል። መልካም ዕድል!", parse_mode="HTML")
     
-    # በሕዝባዊ ግሩፑ ላይ ማሳወቅ
+    # በጨዋታው ሜዳ (ግሩፕ ወይም ቻት) ላይ ማሳወቅ
     current_count = len(active_games[chat_id])
     await bot.send_message(
         chat_id=chat_id,
-        text=f"📣 <b>የደስታ ዜና!</b>\n👤 <b>{user_data['name']}</b> ቁጥር <b>{selected_num}</b>ን በ30 ብር ገዝቷል።\n📊 በአጠቃላይ የተሸጡ ትኬቶች፦ <b>{current_count}/10</b>",
+        text=f"📣 <b>የደስታ ዜና!</b>\n👤 <b>{user_data['name']}</b> ቁጥር <b>{selected_num}</b>ን ገዝቷል።\n📊 የተሸጡ ትኬቶች፦ <b>{current_count}/10</b>",
         parse_mode="HTML"
     )
     
-    # 🔥 ቁልፉ ወደ ላይ እንዳይደበቅ ዋናውን ኪቦርድ እዚያው ባለበት ማደስ (Edit)
+    # 🔄 ዋናው የመጫወቻ ሰሌዳ ቁልፍ ሳይደበቅ በነበረበት ቦታ እንዲታደስ (Edit) ማድረግ
     try:
         updated_text = (
-            "🎡 <b>እንኳን ወደ ሕዝባዊ የዕድል እሽከርክሪት መድረክ መጡ!</b> 🎡\n\n"
+            "🎡 <b>እንኳን ወደ ዕድል እሽከርክሪት መድረክ በሰላም መጡ!</b> 🎡\n\n"
             "💵 የትኬት ዋጋ፦ <b>30 ብር</b>\n"
             f"👥 አሁን የተሸጡ ትኬቶች፦ <b>{current_count}/10</b>\n\n"
             "ከ1 እስከ 10 ያለውን የዕድል ቁጥርዎን በመምረጥ ይሳተፉ፦"
@@ -198,11 +175,10 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption=f"✅ ተፈቅዷል! ቁጥር {selected_num} ተመዝግቧል።", reply_markup=None)
     
-    # 10 ሰው ከሞላ ጨዋታውን ማስጀመር
     if current_count >= 10:
         await start_spinning_effect(chat_id, user_data["main_msg_id"])
 
-# ❌ አድሚኑ ውድቅ ሲያደርገው
+# ❌ አድሚኑ ውድቅ ሲያደርግ
 @dp.callback_query(F.data.startswith("adm_rj_"))
 async def admin_reject_handler(callback_query: types.CallbackQuery):
     if callback_query.from_user.id != ADMIN_CHAT_ID:
@@ -215,7 +191,7 @@ async def admin_reject_handler(callback_query: types.CallbackQuery):
         await callback_query.answer()
         return
         
-    await bot.send_message(chat_id=target_user_id, text="❌ <b>ክፍያዎ ውድቅ ተደርጓል!</b>\nየላኩት ስክሪንሾት ትክክለኛ አይደለም። እባክዎ እንደገና በትክክል ይክፈሉ ያረጋግጡ።", parse_mode="HTML")
+    await bot.send_message(chat_id=target_user_id, text="❌ <b>ክፍያዎ ውድቅ ተደርጓል!</b>\nየላኩት ስክሪንሾት ትክክለኛ አይደለም። እባክዎ በትክክል መክፈልዎን ያረጋግጡ።", parse_mode="HTML")
     
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption="❌ ይህ ክፍያ ውድቅ ተደርጓል።", reply_markup=None)
