@@ -45,7 +45,6 @@ async def start_handler(message: types.Message):
     if chat_id not in active_games:
         active_games[chat_id] = {}
 
-    # 🎯 መጫወቻ ሜዳው መጀመሪያ እዚህ ጋ በግልጽ ይወጣል!
     welcome_text = (
         "🎡 <b>እንኳን ወደ ዕድል እሽከርክሪት መድረክ በሰላም መጡ!</b> 🎡\n\n"
         "💵 የትኬት ዋጋ፦ <b>30 ብር</b>\n"
@@ -69,7 +68,6 @@ async def buy_number_handler(callback_query: types.CallbackQuery):
 
     await callback_query.answer()
     
-    # 💳 የክፍያ መመሪያው በተጫዋቹ ስክሪን ላይ ይወጣል
     payment_instruction = (
         f"🎯 <b>ቁጥር {selected_num}ን መርጠዋል!</b>\n\n"
         f"💰 እባክዎ <b>30 ብር</b> በቴሌብር (Telebirr) በሚከተለው ስልክ ቁጥር ይላኩ፦\n"
@@ -91,7 +89,6 @@ async def buy_number_handler(callback_query: types.CallbackQuery):
 async def already_sold_handler(callback_query: types.CallbackQuery):
     await callback_query.answer("❌ ይህ ቁጥር ተሽጧል! እባክዎ ሌላ ቁጥር ይምረጡ።", show_alert=True)
 
-# 📸 ተጫዋቹ ስክሪንሾት ሲልክ (በውስጥ መስመር ማጽደቂያ)
 @dp.message(F.photo)
 async def screenshot_receiver(message: types.Message):
     user_id = message.from_user.id
@@ -105,7 +102,6 @@ async def screenshot_receiver(message: types.Message):
     
     await message.reply("📥 <b>የክፍያ ስክሪንሾትዎ ደርሶናል። በአስተዳዳሪው ተረጋግጦ ቁጥሩ እስኪመዘገብ እባክዎ በትዕግስት ይጠብቁ!</b>", parse_mode="HTML")
     
-    # 🔐 ለአድሚኑ (ላንተ) ብቻ በውስጥ መስመር የሚመጣ ማጽደቂያ ቁልፍ
     admin_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="✅ አጽድቅ (Approve)", callback_data=f"adm_ap_{user_id}"),
@@ -121,7 +117,6 @@ async def screenshot_receiver(message: types.Message):
         parse_mode="HTML"
     )
 
-# ✅ አድሚኑ ሲያጸድቅ (ደህንነቱ የተጠበቀ - ያንተን ID ብቻ ነው የሚሰማው)
 @dp.callback_query(F.data.startswith("adm_ap_"))
 async def admin_approve_handler(callback_query: types.CallbackQuery):
     if callback_query.from_user.id != ADMIN_CHAT_ID:
@@ -143,10 +138,8 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
         
     active_games[chat_id][selected_num] = {"user_id": target_user_id, "name": user_data["name"]}
     
-    # ለተጫዋቹ ማሳወቅ
     await bot.send_message(chat_id=target_user_id, text=f"🎉 <b>ክፍያዎ ተረጋግጧል!</b>\n🔢 <b>ቁጥር {selected_num}</b> ለእርስዎ በትክክል ተመዝግቧል። መልካም ዕድል!", parse_mode="HTML")
     
-    # በጨዋታው ሜዳ ላይ ማሳወቅ
     current_count = len(active_games[chat_id])
     await bot.send_message(
         chat_id=chat_id,
@@ -154,7 +147,6 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
         parse_mode="HTML"
     )
     
-    # 🔄 ዋናው የመጫወቻ ሰሌዳ ቁልፍ ሳይደበቅ በነበረበት ቦታ እንዲታደስ (Edit) ማድረግ
     try:
         updated_text = (
             "🎡 <b>እንኳን ወደ ዕድል እሽከርክሪት መድረክ በሰላም መጡ!</b> 🎡\n\n"
@@ -175,11 +167,9 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption=f"✅ ተፈቅዷል! ቁጥር {selected_num} ተመዝግቧል።", reply_markup=None)
     
-    # 🎲 10 ሰው ሙሉ በሙሉ ሲሞላ እጣውን በራስ-ሰር ማሽከርከር
     if current_count >= 10:
         await start_spinning_effect(chat_id, user_data["main_msg_id"])
 
-# ❌ አድሚኑ ውድቅ ሲያደርግ
 @dp.callback_query(F.data.startswith("adm_rj_"))
 async def admin_reject_handler(callback_query: types.CallbackQuery):
     if callback_query.from_user.id != ADMIN_CHAT_ID:
@@ -197,48 +187,55 @@ async def admin_reject_handler(callback_query: types.CallbackQuery):
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption="❌ ይህ ክፍያ ውድቅ ተደርጓል።", reply_markup=None)
 
-# 🎰 እውነተኛው የሚሽከረከር የዕጣ አወጣጥ ክፍል
+# 🔥 የተስተካከለው እና ለ 30 ሰኮንድ የሚቆየው የዕጣ አወጣጥ ክፍል
 async def start_spinning_effect(chat_id: int, main_msg_id: int):
-    announcement = await bot.send_message(
-        chat_id=chat_id, 
-        text="🚨 <b>10ቱም ትኬቶች በሙሉ ተሽጠዋል! የዕድል መንኮራኩሩ አሁን ይሽከረከራል...</b> 🚨", 
-        parse_mode="HTML"
-    )
-    await asyncio.sleep(2)
+    # 1. መጀመሪያ ለ 25 ሰኮንድ የሚቆይ አስደሳች የጽሑፍ አኒሜሽን (Countdown)
+    msg = await bot.send_message(chat_id=chat_id, text="🚨 <b>10ቱም ትኬቶች በሙሉ ተሽጠዋል! እጣው አሁን ይጀመራል...</b>", parse_mode="HTML")
     
-    # 🎰 የቴሌግራምን እውነተኛ የሚሽከረከር Slot Machine አኒሜሽን መላክ
-    dice_msg = await bot.send_dice(chat_id=chat_id, emoji="🎰")
-    dice_value = dice_msg.dice.value # ከቴሌግራም አገልጋይ የሚመጣ የዘፈቀደ ቁጥር
+    # ሰዎችን በጉጉት ለማቆየት በየ 5 ሰኮንዱ መልዕክቱን ማደስ (ጠቅላላ 25 ሰኮንድ)
+    await asyncio.sleep(5)
+    await msg.edit_text("🔄 <b>የዕድል መንኮራኩሩ በከፍተኛ ፍጥነት መሽከርከር ጀምሯል... [ 🔄 SPINNING ]</b>", parse_mode="HTML")
     
-    # አኒሜሽኑ ተሽከርክሮ እስኪያልቅ 4 ሰከንድ መታገስ
+    await asyncio.sleep(5)
+    await msg.edit_text("⚡ <b>ፍጥነቱ እየጨመረ ነው! አሸናፊው ማን ሊሆን ይችላል? ፌሪስ ዊሉ እየዞረ ነው...</b>", parse_mode="HTML")
+    
+    await asyncio.sleep(5)
+    await msg.edit_text("🎯 <b>መንኮራኩሩ ፍጥነቱን እየቀነሰ ነው... ወደ መጨረሻው ቁጥር እየተቃረበ ነው!</b>", parse_mode="HTML")
+    
+    await asyncio.sleep(5)
+    await msg.edit_text("🔥 <b>የመጨረሻ 5 ሰከንድ! ልብ ሰቀላ ሰዓት... እጣው አሁን ይቆማል!...</b>", parse_mode="HTML")
+    await asyncio.sleep(5)
+    
+    await msg.delete() # የጽሑፍ አኒሜሽኑን ማጥፋት
+
+    # 2. ቀሪውን 5 ሰከንድ በዕይታ ለማሳመር እውነተኛ የቴሌግራም ዳርት (🎯) መላክ
+    # የዳርት ኢሞጂ ውጤት ከ 1 እስከ 6 ቁጥሮችን ብቻ ነው የሚሰጠው። 
+    # ስለዚህ ውጤቱ 100% ከምስሉ ጋር እኩል እንዲሆን እጣውን ከ 1 እስከ 6 ቁጥሮች ውስጥ እናደርገዋለን።
+    dice_msg = await bot.send_dice(chat_id=chat_id, emoji="🎯")
+    winner_number = str(dice_msg.dice.value) # ምስሉ ላይ ያረፈው እውነተኛ ቁጥር (ከ1 እስከ 6)
+    
+    # ዳርቱ ተወርውሮ ሰሌዳው ላይ እስኪያርፍ 4 ሰከንድ መታገስ
     await asyncio.sleep(4)
-    
-    # ከዳይሱ ውጤት ላይ ከ 1 እስከ 10 ያለውን አሸናፊ ቁጥር ቀምሮ ማውጣት
-    winner_number = str((dice_value % 10) + 1)
     
     players = active_games[chat_id]
     winner_user = players.get(winner_number)
     
+    # 3. ውጤቱን ማወጅ (ከምስሉ ቁጥር ጋር ፍጹም አንድ አይነት ይሆናል)
     if winner_user:
         result_text = (
-            f"🎯 <b>የዕድል እሽከርክሪቱ ቆሟል!</b>\n"
-            f"🎰 የዕጣው ውጤት ቁጥር፦ <b>ቁጥር {winner_number}</b>\n\n"
-            f"🎉🎉 <b>እንኳን ደስ አሎት!</b> 🎉🎉\n"
+            f"🎉 <b>ዕጣው በይፋ ወጥቷል! እንኳን ደስ አሎት!</b> 🎉\n\n"
+            f"🎯 በምስሉ ላይ የወጣው አሸናፊ ቁጥር፦ <b>ቁጥር {winner_number}</b>\n"
             f"👑 የዚህ ዙር ሻምፒዮን፦ <a href='tg://user?id={winner_user['user_id']}'>{winner_user['name']}</a>\n\n"
-            f"💰 <b>የ 200 ብር</b> ሽልማትዎን ለመቀበል አሁኑኑ ለአስተዳዳሪው መልዕክት ይላኩ!"
+            f"💰 <b>የ 200 ብር</b> ሽልማትዎን ለመቀበል ለአስተዳዳሪው መልዕክት ይላኩ!"
         )
     else:
         result_text = (
-            f"🎯 <b>የዕድል እሽከርክሪቱ ቆሟል!</b>\n"
-            f"🎰 የዕጣው ውጤት ቁጥር፦ <b>ቁጥር {winner_number}</b>\n\n"
-            f"😔 <b>የሚገርም ነው!</b> ይህንን ቁጥር ማንም ስላልገዛው በዚህ ዙር አሸናፊ የለም።\n"
+            f"🎯 በምስሉ ላይ የወጣው ቁጥር፦ <b>ቁጥር {winner_number}</b> ነበር።\n\n"
+            f"😔 <b>የሚገርም ነው!</b> ይህንን ቁጥር በዚህ ዙር ማንም ስላልገዛው አሸናፊ የለም።\n"
             f"💰 የተሰበሰበው ገንዘብ በቀጥታ ወደ ሚቀጥለው ዙር ተላልፏል! አዲስ ዙር ለመጀመር /start ይበሉ።"
         )
         
-    await announcement.delete() 
     await bot.send_message(chat_id=chat_id, text=result_text, parse_mode="HTML")
-    
-    # ጨዋታውን ለሚቀጥለው አዲስ ዙር ዳግም ባዶ ማድረግ
     active_games[chat_id] = {}
 
 async def main():
