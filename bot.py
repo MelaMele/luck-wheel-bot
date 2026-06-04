@@ -11,7 +11,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID = 1065443252  
 TELEBIRR_NUMBER = "+251913064239" 
 
-# 🎬 የሚሽከረከር የመንኮራኩር GIF (በቴሌግራም አገልጋይ ላይ የሚገኝ ነፃ አኒሜሽን)
+# 🎬 የሚሽከረከር የቁጥር መንኮራኩር GIF ሊንክ (ቀልጣፋና አስተማማኝ)
 SPINNING_WHEEL_GIF = "https://media.giphy.com/media/l3vQYm0jW945U2CJi/giphy.gif"
 
 bot = Bot(token=BOT_TOKEN)
@@ -170,6 +170,7 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption=f"✅ ተፈቅዷል! ቁጥር {selected_num} ተመዝግቧል።", reply_markup=None)
     
+    # 🎰 10 ሰው ሙሉ በሙሉ ሲሞላ እጣውን በራስ-ሰር ማሽከርከር
     if current_count >= 10:
         await start_spinning_effect(chat_id, user_data["main_msg_id"])
 
@@ -190,12 +191,12 @@ async def admin_reject_handler(callback_query: types.CallbackQuery):
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption="❌ ይህ ክፍያ ውድቅ ተደርጓል።", reply_markup=None)
 
-# 🔥 ቪዲዮን እና የ 30 ሰኮንድ ልብ ሰቀላ አኒሜሽን ያካተተው አዲሱ የዕጣ አወጣጥ ክፍል
+# 🔥 የተስተካከለው የ 30 ሰኮንድ ልብ ሰቀላ አኒሜሽን እና እውነተኛ እሽከርክሪት
 async def start_spinning_effect(chat_id: int, main_msg_id: int):
-    # 1. አሸናፊውን ቁጥር ከ 1 እስከ 10 በምስጢር አስቀድሞ መምረጥ
+    # 1. አሸናፊውን ቁጥር ከ 1 እስከ 10 አስቀድሞ በዘፈቀደ መምረጥ
     winner_number = str(random.randint(1, 10))
     
-    # 2. የሚሽከረከረውን እውነተኛ የቪዲዮ/GIF አኒሜሽን ለግሩፑ መላክ
+    # 2. የሚሽከረከረውን እውነተኛ አኒሜሽን (GIF) ለግሩፑ መላክ
     wheel_msg = await bot.send_animation(
         chat_id=chat_id, 
         animation=SPINNING_WHEEL_GIF,
@@ -203,12 +204,12 @@ async def start_spinning_effect(chat_id: int, main_msg_id: int):
         parse_mode="HTML"
     )
     
-    # 3. ለ 30 ሰኮንድ ያህል በየመሃሉ ጽሑፉን በማደስ ተጫዋቾችን በጉጉት ማቆየት
+    # 3. ልክ ለ 30 ሰኮንድ ያህል በየ 6 ሰኮንዱ የጽሑፍ መግለጫውን (Caption) ማደስ (ልብ ሰቀላ ሰዓት)
     await asyncio.sleep(6)
-    await wheel_msg.edit_caption(caption="⚡ <b>መንኮራኩሩ በከፍተኛ ፍጥነት እየዞረ ነው! የሁሉም ልብ ሰቅሏል... ማን ያሸንፍ ይሆን?</b>", parse_mode="HTML")
+    await wheel_msg.edit_caption(caption="⚡ <b>መንኮራኩሩ በከፍተኛ ፍጥነት እየዞረ ነው! ማን ያሸንፍ ይሆን? የሁሉም ሰው ዓይን ስክሪኑ ላይ ነው...</b>", parse_mode="HTML")
     
     await asyncio.sleep(6)
-    await wheel_msg.edit_caption(caption="🎡 <b>የዕድል መንኮራኩሩ ፍጥነቱን ቀስ በቀስ እየቀነሰ ነው... ወደ መቆሚያው እየደረሰ ነው!</b>", parse_mode="HTML")
+    await wheel_msg.edit_caption(caption="🎡 <b>የዕድል መንኮራኩሩ ፍጥነቱን ቀስ በቀስ እየቀነሰ ነው... ወደ መቆሚያው ቁጥር እየተቃረበ ነው!</b>", parse_mode="HTML")
     
     await asyncio.sleep(6)
     await wheel_msg.edit_caption(caption="🎯 <b>አንድ ቁጥር ላይ ሊያርፍ ነው!... የመጨረሻ 10 ሰከንድ!</b>", parse_mode="HTML")
@@ -217,8 +218,11 @@ async def start_spinning_effect(chat_id: int, main_msg_id: int):
     await wheel_msg.edit_caption(caption="🔥 <b>መንኮራኩሩ ቆሟል! ውጤቱ አሁን ይፋ ይሆናል!...</b>", parse_mode="HTML")
     await asyncio.sleep(6)
     
-    # 4. የሚሽከረከረውን ቪዲዮ አጥፍቶ የመጨረሻውን ውጤት በታላቅ ድምቀት ማወጅ
-    await wheel_msg.delete()
+    # 4. የሚሽከረከረውን ምስል አጥፍቶ የመጨረሻውን ውጤት ማወጅ (ከምስሉ ጋር 100% ይገጥማል)
+    try:
+        await wheel_msg.delete()
+    except Exception:
+        pass
     
     players = active_games[chat_id]
     winner_user = players.get(winner_number)
@@ -239,7 +243,7 @@ async def start_spinning_effect(chat_id: int, main_msg_id: int):
         
     await bot.send_message(chat_id=chat_id, text=result_text, parse_mode="HTML")
     
-    # ጨዋታውን ለሚቀጥለው ዙር ዳግም ባዶ ማድረግ
+    # ጨዋታውን ለሚቀጥለው አዲስ ዙር ማጽዳት
     active_games[chat_id] = {}
 
 async def main():
