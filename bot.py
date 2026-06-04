@@ -11,6 +11,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID = 1065443252  
 TELEBIRR_NUMBER = "+251913064239" 
 
+# 🎬 የሚሽከረከር የመንኮራኩር GIF (በቴሌግራም አገልጋይ ላይ የሚገኝ ነፃ አኒሜሽን)
+SPINNING_WHEEL_GIF = "https://media.giphy.com/media/l3vQYm0jW945U2CJi/giphy.gif"
+
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
@@ -187,55 +190,56 @@ async def admin_reject_handler(callback_query: types.CallbackQuery):
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption="❌ ይህ ክፍያ ውድቅ ተደርጓል።", reply_markup=None)
 
-# 🔥 የተስተካከለው እና ለ 30 ሰኮንድ የሚቆየው የዕጣ አወጣጥ ክፍል
+# 🔥 ቪዲዮን እና የ 30 ሰኮንድ ልብ ሰቀላ አኒሜሽን ያካተተው አዲሱ የዕጣ አወጣጥ ክፍል
 async def start_spinning_effect(chat_id: int, main_msg_id: int):
-    # 1. መጀመሪያ ለ 25 ሰኮንድ የሚቆይ አስደሳች የጽሑፍ አኒሜሽን (Countdown)
-    msg = await bot.send_message(chat_id=chat_id, text="🚨 <b>10ቱም ትኬቶች በሙሉ ተሽጠዋል! እጣው አሁን ይጀመራል...</b>", parse_mode="HTML")
+    # 1. አሸናፊውን ቁጥር ከ 1 እስከ 10 በምስጢር አስቀድሞ መምረጥ
+    winner_number = str(random.randint(1, 10))
     
-    # ሰዎችን በጉጉት ለማቆየት በየ 5 ሰኮንዱ መልዕክቱን ማደስ (ጠቅላላ 25 ሰኮንድ)
-    await asyncio.sleep(5)
-    await msg.edit_text("🔄 <b>የዕድል መንኮራኩሩ በከፍተኛ ፍጥነት መሽከርከር ጀምሯል... [ 🔄 SPINNING ]</b>", parse_mode="HTML")
+    # 2. የሚሽከረከረውን እውነተኛ የቪዲዮ/GIF አኒሜሽን ለግሩፑ መላክ
+    wheel_msg = await bot.send_animation(
+        chat_id=chat_id, 
+        animation=SPINNING_WHEEL_GIF,
+        caption="🚨 <b>10ቱም ትኬቶች ተሽጠዋል! የዕድል መንኮራኩሩ መሽከርከር ጀምሯል... [ 🔄 SPINNING ]</b>",
+        parse_mode="HTML"
+    )
     
-    await asyncio.sleep(5)
-    await msg.edit_text("⚡ <b>ፍጥነቱ እየጨመረ ነው! አሸናፊው ማን ሊሆን ይችላል? ፌሪስ ዊሉ እየዞረ ነው...</b>", parse_mode="HTML")
+    # 3. ለ 30 ሰኮንድ ያህል በየመሃሉ ጽሑፉን በማደስ ተጫዋቾችን በጉጉት ማቆየት
+    await asyncio.sleep(6)
+    await wheel_msg.edit_caption(caption="⚡ <b>መንኮራኩሩ በከፍተኛ ፍጥነት እየዞረ ነው! የሁሉም ልብ ሰቅሏል... ማን ያሸንፍ ይሆን?</b>", parse_mode="HTML")
     
-    await asyncio.sleep(5)
-    await msg.edit_text("🎯 <b>መንኮራኩሩ ፍጥነቱን እየቀነሰ ነው... ወደ መጨረሻው ቁጥር እየተቃረበ ነው!</b>", parse_mode="HTML")
+    await asyncio.sleep(6)
+    await wheel_msg.edit_caption(caption="🎡 <b>የዕድል መንኮራኩሩ ፍጥነቱን ቀስ በቀስ እየቀነሰ ነው... ወደ መቆሚያው እየደረሰ ነው!</b>", parse_mode="HTML")
     
-    await asyncio.sleep(5)
-    await msg.edit_text("🔥 <b>የመጨረሻ 5 ሰከንድ! ልብ ሰቀላ ሰዓት... እጣው አሁን ይቆማል!...</b>", parse_mode="HTML")
-    await asyncio.sleep(5)
+    await asyncio.sleep(6)
+    await wheel_msg.edit_caption(caption="🎯 <b>አንድ ቁጥር ላይ ሊያርፍ ነው!... የመጨረሻ 10 ሰከንድ!</b>", parse_mode="HTML")
     
-    await msg.delete() # የጽሑፍ አኒሜሽኑን ማጥፋት
-
-    # 2. ቀሪውን 5 ሰከንድ በዕይታ ለማሳመር እውነተኛ የቴሌግራም ዳርት (🎯) መላክ
-    # የዳርት ኢሞጂ ውጤት ከ 1 እስከ 6 ቁጥሮችን ብቻ ነው የሚሰጠው። 
-    # ስለዚህ ውጤቱ 100% ከምስሉ ጋር እኩል እንዲሆን እጣውን ከ 1 እስከ 6 ቁጥሮች ውስጥ እናደርገዋለን።
-    dice_msg = await bot.send_dice(chat_id=chat_id, emoji="🎯")
-    winner_number = str(dice_msg.dice.value) # ምስሉ ላይ ያረፈው እውነተኛ ቁጥር (ከ1 እስከ 6)
+    await asyncio.sleep(6)
+    await wheel_msg.edit_caption(caption="🔥 <b>መንኮራኩሩ ቆሟል! ውጤቱ አሁን ይፋ ይሆናል!...</b>", parse_mode="HTML")
+    await asyncio.sleep(6)
     
-    # ዳርቱ ተወርውሮ ሰሌዳው ላይ እስኪያርፍ 4 ሰከንድ መታገስ
-    await asyncio.sleep(4)
+    # 4. የሚሽከረከረውን ቪዲዮ አጥፍቶ የመጨረሻውን ውጤት በታላቅ ድምቀት ማወጅ
+    await wheel_msg.delete()
     
     players = active_games[chat_id]
     winner_user = players.get(winner_number)
     
-    # 3. ውጤቱን ማወጅ (ከምስሉ ቁጥር ጋር ፍጹም አንድ አይነት ይሆናል)
     if winner_user:
         result_text = (
             f"🎉 <b>ዕጣው በይፋ ወጥቷል! እንኳን ደስ አሎት!</b> 🎉\n\n"
-            f"🎯 በምስሉ ላይ የወጣው አሸናፊ ቁጥር፦ <b>ቁጥር {winner_number}</b>\n"
+            f"🎡 የዕድል መንኮራኩሩ ያረፈበት ቁጥር፦ <b>ቁጥር {winner_number}</b>\n"
             f"👑 የዚህ ዙር ሻምፒዮን፦ <a href='tg://user?id={winner_user['user_id']}'>{winner_user['name']}</a>\n\n"
-            f"💰 <b>የ 200 ብር</b> ሽልማትዎን ለመቀበል ለአስተዳዳሪው መልዕክት ይላኩ!"
+            f"💰 <b>የ 200 ብር</b> ሽልማትዎን ለመቀበል አሁኑኑ ለአስተዳዳሪው መልዕክት ይላኩ!"
         )
     else:
         result_text = (
-            f"🎯 በምስሉ ላይ የወጣው ቁጥር፦ <b>ቁጥር {winner_number}</b> ነበር።\n\n"
+            f"🎡 የዕድል መንኮራኩሩ ያረፈበት ቁጥር፦ <b>ቁጥር {winner_number}</b> ነበር።\n\n"
             f"😔 <b>የሚገርም ነው!</b> ይህንን ቁጥር በዚህ ዙር ማንም ስላልገዛው አሸናፊ የለም።\n"
             f"💰 የተሰበሰበው ገንዘብ በቀጥታ ወደ ሚቀጥለው ዙር ተላልፏል! አዲስ ዙር ለመጀመር /start ይበሉ።"
         )
         
     await bot.send_message(chat_id=chat_id, text=result_text, parse_mode="HTML")
+    
+    # ጨዋታውን ለሚቀጥለው ዙር ዳግም ባዶ ማድረግ
     active_games[chat_id] = {}
 
 async def main():
