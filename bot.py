@@ -11,9 +11,6 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID = 1065443252  
 TELEBIRR_NUMBER = "+251913064239" 
 
-# 🎬 የሚሽከረከር የቁጥር መንኮራኩር GIF ሊንክ (ቀልጣፋና አስተማማኝ)
-SPINNING_WHEEL_GIF = "https://media.giphy.com/media/l3vQYm0jW945U2CJi/giphy.gif"
-
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
@@ -44,7 +41,6 @@ def generate_keyboard(chat_id):
 @dp.message(Command("start"))
 async def start_handler(message: types.Message):
     chat_id = message.chat.id
-    
     if chat_id not in active_games:
         active_games[chat_id] = {}
 
@@ -54,7 +50,6 @@ async def start_handler(message: types.Message):
         f"👥 አሁን የተሸጡ ትኬቶች፦ <b>{len(active_games[chat_id])}/10</b>\n\n"
         "ከ1 እስከ 10 ያለውን የዕድል ቁጥርዎን በመምረጥ ይሳተፉ፦"
     )
-    
     await message.answer(text=welcome_text, reply_markup=generate_keyboard(chat_id), parse_mode="HTML")
 
 @dp.callback_query(F.data.startswith("buy_"))
@@ -85,7 +80,6 @@ async def buy_number_handler(callback_query: types.CallbackQuery):
         "name": username,
         "main_msg_id": callback_query.message.message_id 
     }
-    
     await callback_query.message.answer(text=payment_instruction, parse_mode="HTML")
 
 @dp.callback_query(F.data.startswith("already_sold_"))
@@ -95,7 +89,6 @@ async def already_sold_handler(callback_query: types.CallbackQuery):
 @dp.message(F.photo)
 async def screenshot_receiver(message: types.Message):
     user_id = message.from_user.id
-    
     if user_id not in pending_payments:
         await message.reply("⚠️ እባክዎ መጀመሪያ ከላይ ቁጥር ይምረጡ፤ ከዚያ የስክሪንሾት ፎቶ ይላኩ።")
         return
@@ -127,7 +120,6 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
         return
         
     target_user_id = int(callback_query.data.split("_")[2])
-    
     if target_user_id not in pending_payments:
         await callback_query.answer("❌ ይህ ጥያቄ የለም ወይም ምላሽ አግኝቷል።")
         return
@@ -170,9 +162,10 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption=f"✅ ተፈቅዷል! ቁጥር {selected_num} ተመዝግቧል።", reply_markup=None)
     
-    # 🎰 10 ሰው ሙሉ በሙሉ ሲሞላ እጣውን በራስ-ሰር ማሽከርከር
+    # 🎰 10 ሰው ሙሉ በሙሉ ሲሞላ እጣውን ያለምንም መቆራረጥ እዚህ ጋር ማስጀመር
     if current_count >= 10:
-        await start_spinning_effect(chat_id, user_data["main_msg_id"])
+        # በስተጀርባ (Background) በሰላም እንዲሰራ Background Task እናደርገዋለን
+        asyncio.create_task(start_spinning_effect(chat_id))
 
 @dp.callback_query(F.data.startswith("adm_rj_"))
 async def admin_reject_handler(callback_query: types.CallbackQuery):
@@ -181,69 +174,59 @@ async def admin_reject_handler(callback_query: types.CallbackQuery):
         return
         
     target_user_id = int(callback_query.data.split("_")[2])
-    
     if target_user_id not in pending_payments:
         await callback_query.answer()
         return
         
     await bot.send_message(chat_id=target_user_id, text="❌ <b>ክፍያዎ ውድቅ ተደርጓል!</b>\nየላኩት ስክሪንሾት ትክክለኛ አይደለም። እባክዎ በትክክል መክፈልዎን ያረጋግጡ።", parse_mode="HTML")
-    
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption="❌ ይህ ክፍያ ውድቅ ተደርጓል።", reply_markup=None)
 
-# 🔥 የተስተካከለው የ 30 ሰኮንድ ልብ ሰቀላ አኒሜሽን እና እውነተኛ እሽከርክሪት
-async def start_spinning_effect(chat_id: int, main_msg_id: int):
-    # 1. አሸናፊውን ቁጥር ከ 1 እስከ 10 አስቀድሞ በዘፈቀደ መምረጥ
+# 🛠 100% አስተማማኝ እና ፈጣን የሆነው የዕጣ አወጣጥ ተግባር
+async def start_spinning_effect(chat_id: int):
+    # 1. አሸናፊውን ቁጥር ወዲያውኑ መምረጥ
     winner_number = str(random.randint(1, 10))
     
-    # 2. የሚሽከረከረውን እውነተኛ አኒሜሽን (GIF) ለግሩፑ መላክ
-    wheel_msg = await bot.send_animation(
+    # 2. መልዕክት መላክ
+    msg = await bot.send_message(
         chat_id=chat_id, 
-        animation=SPINNING_WHEEL_GIF,
-        caption="🚨 <b>10ቱም ትኬቶች ተሽጠዋል! የዕድል መንኮራኩሩ መሽከርከር ጀምሯል... [ 🔄 SPINNING ]</b>",
+        text="🚨 <b>10ቱም ትኬቶች በሙሉ ተሽጠዋል! የዕድል እሽከርክሪቱ አሁን ይጀምራል...</b>", 
         parse_mode="HTML"
     )
     
-    # 3. ልክ ለ 30 ሰኮንድ ያህል በየ 6 ሰኮንዱ የጽሑፍ መግለጫውን (Caption) ማደስ (ልብ ሰቀላ ሰዓት)
+    # 3. የጽሑፍ አኒሜሽን ልብ ሰቀላ (30 ሰከንድ) - ያለምንም ምስል መቆራረጥ በቀጥታ ይሰራል
     await asyncio.sleep(6)
-    await wheel_msg.edit_caption(caption="⚡ <b>መንኮራኩሩ በከፍተኛ ፍጥነት እየዞረ ነው! ማን ያሸንፍ ይሆን? የሁሉም ሰው ዓይን ስክሪኑ ላይ ነው...</b>", parse_mode="HTML")
+    await msg.edit_text("🔄 <b>የዕድል መንኮራኩሩ በከፍተኛ ፍጥነት እየተሽከረከረ ነው... [ 🎰 SPINNING ]</b>", parse_mode="HTML")
     
     await asyncio.sleep(6)
-    await wheel_msg.edit_caption(caption="🎡 <b>የዕድል መንኮራኩሩ ፍጥነቱን ቀስ በቀስ እየቀነሰ ነው... ወደ መቆሚያው ቁጥር እየተቃረበ ነው!</b>", parse_mode="HTML")
+    await msg.edit_text("⚡ <b>ፍጥነቱ ጨምሯል! ማንም ሊገምተው የማይችለው ሰዓት... አሸናፊው ማን ይሆን?</b>", parse_mode="HTML")
     
     await asyncio.sleep(6)
-    await wheel_msg.edit_caption(caption="🎯 <b>አንድ ቁጥር ላይ ሊያርፍ ነው!... የመጨረሻ 10 ሰከንድ!</b>", parse_mode="HTML")
+    await msg.edit_text("🎡 <b>መንኮራኩሩ ፍጥነቱን ቀስ በቀስ እየቀነሰ ነው... ወደ መቆሚያው እየተቃረበ ነው!</b>", parse_mode="HTML")
     
     await asyncio.sleep(6)
-    await wheel_msg.edit_caption(caption="🔥 <b>መንኮራኩሩ ቆሟል! ውጤቱ አሁን ይፋ ይሆናል!...</b>", parse_mode="HTML")
+    await msg.edit_text("🎯 <b>አንድ ቁጥር ላይ ሊያርፍ ነው!... የመጨረሻ 5 ሰከንዶች!</b>", parse_mode="HTML")
     await asyncio.sleep(6)
     
-    # 4. የሚሽከረከረውን ምስል አጥፍቶ የመጨረሻውን ውጤት ማወጅ (ከምስሉ ጋር 100% ይገጥማል)
-    try:
-        await wheel_msg.delete()
-    except Exception:
-        pass
-    
-    players = active_games[chat_id]
+    # 4. ጨዋታውን ማፅዳትና ውጤቱን ማወጅ
+    players = active_games.get(chat_id, {})
     winner_user = players.get(winner_number)
     
     if winner_user:
         result_text = (
             f"🎉 <b>ዕጣው በይፋ ወጥቷል! እንኳን ደስ አሎት!</b> 🎉\n\n"
-            f"🎡 የዕድል መንኮራኩሩ ያረፈበት ቁጥር፦ <b>ቁጥር {winner_number}</b>\n"
+            f"🎰 የዕድል መንኮራኩሩ ያረፈበት ቁጥር፦ <b>ቁጥር {winner_number}</b>\n"
             f"👑 የዚህ ዙር ሻምፒዮን፦ <a href='tg://user?id={winner_user['user_id']}'>{winner_user['name']}</a>\n\n"
             f"💰 <b>የ 200 ብር</b> ሽልማትዎን ለመቀበል አሁኑኑ ለአስተዳዳሪው መልዕክት ይላኩ!"
         )
     else:
         result_text = (
-            f"🎡 የዕድል መንኮራኩሩ ያረፈበት ቁጥር፦ <b>ቁጥር {winner_number}</b> ነበር።\n\n"
+            f"🎰 የዕድል መንኮራኩሩ ያረፈበት ቁጥር፦ <b>ቁጥር {winner_number}</b> ነበር።\n\n"
             f"😔 <b>የሚገርም ነው!</b> ይህንን ቁጥር በዚህ ዙር ማንም ስላልገዛው አሸናፊ የለም።\n"
             f"💰 የተሰበሰበው ገንዘብ በቀጥታ ወደ ሚቀጥለው ዙር ተላልፏል! አዲስ ዙር ለመጀመር /start ይበሉ።"
         )
         
-    await bot.send_message(chat_id=chat_id, text=result_text, parse_mode="HTML")
-    
-    # ጨዋታውን ለሚቀጥለው አዲስ ዙር ማጽዳት
+    await msg.edit_text(text=result_text, parse_mode="HTML")
     active_games[chat_id] = {}
 
 async def main():
