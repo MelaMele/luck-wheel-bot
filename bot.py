@@ -3,7 +3,13 @@ import random
 import os
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import (
+    InlineKeyboardMarkup, 
+    InlineKeyboardButton, 
+    ReplyKeyboardMarkup, 
+    KeyboardButton,
+    BotCommand
+)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
@@ -15,21 +21,23 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 # የውስጥ ማከማቻ
-active_games = {}     # በየቦታው የተሸጡ ቁጥሮች {"chat_id": {"1": {"user_id":..., "name":...}}}
-pending_payments = {} # ማረጋገጫ የሚጠብቁ {"user_id": {"chat_id":..., "num":..., "main_msg_id":...}}
+active_games = {}     # {"chat_id": {"1": {"user_id":..., "name":...}}}
+pending_payments = {} # {"user_id": {"chat_id":..., "num":..., "main_msg_id":...}}
 
 def generate_keyboard(chat_id):
-    """የቁጥሮችን ሰሌዳ አሁን ባለው ሁኔታ አዘጋጅቶ የሚመልስ ተግባር"""
+    """የቁጥሮችን ሰሌዳ እጅግ ዘመናዊ በሆነ መልኩ የአሸናፊዎችን ስም ጭምር ይዞ የሚመነጭ ተግባር"""
     game = active_games.get(chat_id, {})
     buttons = []
     row = []
     for i in range(1, 11):
         num_str = str(i)
         if num_str in game:
-            text = f"🔴 {i} (የተሸጠ)"
+            # የገዛውን ሰው ስም በአጭሩ በተኑ ላይ ያሳያል (እጅግ ዘመናዊ ያደርገዋል)
+            buyer_name = game[num_str]['name'][:8]  
+            text = f"🔴 {i} ({buyer_name}...)"
             callback_data = f"already_sold_{i}"
         else:
-            text = f"🔢 {i}"
+            text = f"🔢 ቁጥር {i}"
             callback_data = f"buy_{i}_{chat_id}"
             
         row.append(InlineKeyboardButton(text=text, callback_data=callback_data))
@@ -37,6 +45,18 @@ def generate_keyboard(chat_id):
             buttons.append(row)
             row = []
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_main_reply_keyboard():
+    """ከታች ሁልጊዜ የሚቀመጥ ቋሚ የምናሌ ቁልፍ (Persistent Menu)"""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🎰 አዲስ ጨዋታ ጀምር"), KeyboardButton(text="ℹ️ እንዴት ልጫወት?")],
+            [KeyboardButton(text="💳 የክፍያ መረጃ (Telebirr)")]
+        ],
+        resize_keyboard=True,
+        placeholder="ከታች ካሉት አማራጮች አንዱን ይምረጡ..."
+    )
+    return keyboard
 
 @dp.message(Command("start"))
 async def start_handler(message: types.Message):
@@ -46,11 +66,46 @@ async def start_handler(message: types.Message):
 
     welcome_text = (
         "🎡 <b>እንኳን ወደ ዕድል እሽከርክሪት መድረክ በሰላም መጡ!</b> 🎡\n\n"
-        "💵 የትኬት ዋጋ፦ <b>30 ብር</b>\n"
-        f"👥 አሁን የተሸጡ ትኬቶች፦ <b>{len(active_games[chat_id])}/10</b>\n\n"
-        "ከ1 እስከ 10 ያለውን የዕድል ቁጥርዎን በመምረጥ ይሳተፉ፦"
+        "💵 <b>የአንድ ትኬት ዋጋ፦</b> 30 ብር\n"
+        f"👥 <b>የተሸጡ ትኬቶች፦</b> {len(active_games[chat_id])}/10\n\n"
+        "👇 እባክዎ ከታች ካለው ሰሌዳ ላይ የዕድል ቁጥርዎን በመምረጥ ይሳተፉ፦"
     )
-    await message.answer(text=welcome_text, reply_markup=generate_keyboard(chat_id), parse_mode="HTML")
+    # ቋሚ ምናሌውን እና መጫወቻ ሰሌዳውን በአንድ ላይ ያሳያል
+    await message.answer(
+        text=welcome_text, 
+        reply_markup=generate_keyboard(chat_id), 
+        parse_mode="HTML"
+    )
+    # በውስጥ መስመር ከሆነ ቋሚ ምናሌውን ይዘረጋል
+    if message.chat.type == "private":
+        await message.answer("🕹️ ዋናው ምናሌ ተከፍቷል፦", reply_markup=get_main_reply_keyboard())
+
+# ቋሚ በተኖችን በጽሑፍ ሲጫኑ የሚሰሩ ተግባራት
+@dp.message(F.text == "🎰 አዲስ ጨዋታ ጀምር")
+async def menu_start_game(message: types.Message):
+    await start_handler(message)
+
+@dp.message(F.text == "ℹ️ እንዴት ልጫወት?")
+async def menu_help(message: types.Message):
+    help_text = (
+        "📖 <b>የአጫዋች መመሪያ፦</b>\n\n"
+        "1️⃣ ከ1 እስከ 10 ካሉት ቁጥሮች ውስጥ የሚፈልጉትን ይምረጡ።\n"
+        "2️⃣ ቦቱ በውስጥ መስመር የሚልክልዎትን የቴሌብር ቁጥር በመጠቀም 30 ብር ይላኩ።\n"
+        "3️⃣ የከፈሉበትን ስክሪንሾት (Screenshot) ለቦቱ ይላኩ።\n"
+        "4️⃣ አስተዳዳሪው ሲያጸድቅልዎ ቁጥሩ ስምዎ ላይ ይመዘገባል።\n"
+        "5️⃣ 10ቱም ቁጥሮች ሲያልቁ ቦቱ በቀጥታ እጣ አውጥቶ የ 200 ብር ተሸላሚውን ይለያል!"
+    )
+    await message.answer(help_text, parse_mode="HTML")
+
+@dp.message(F.text == "💳 የክፍያ መረጃ (Telebirr)")
+async def menu_payment_info(message: types.Message):
+    pay_text = (
+        f"💳 <b>ትክክለኛ የክፍያ መረጃ፦</b>\n\n"
+        f"📱 የቴሌብር ስልክ ቁጥር፦ <code>{TELEBIRR_NUMBER}</code>\n"
+        f"👤 የተጠቃሚ ስም፦ <b>Melaku Mebrate Tekle</b>\n\n"
+        f"⚠️ ማሳሰቢያ፦ እባክዎ ክፍያ ሲፈጽሙ ስም መሳሳቱን ያረጋግጡ!"
+    )
+    await message.answer(pay_text, parse_mode="HTML")
 
 @dp.callback_query(F.data.startswith("buy_"))
 async def buy_number_handler(callback_query: types.CallbackQuery):
@@ -66,12 +121,14 @@ async def buy_number_handler(callback_query: types.CallbackQuery):
 
     await callback_query.answer()
     
+    # 💳 ክፍያውን ወደ ተጫዋቹ የውስጥ መስመር (DM) ብቻ በመውሰድ ግሩፑን ነጻ ማድረግ
     payment_instruction = (
-        f"🎯 <b>ቁጥር {selected_num}ን መርጠዋል!</b>\n\n"
-        f"💰 እባክዎ <b>30 ብር</b> በቴሌብር (Telebirr) በሚከተለው ስልክ ቁጥር ይላኩ፦\n"
-        f"📱 ስልክ ቁጥር፦ <code>{TELEBIRR_NUMBER}</code>\n"
-        f"👤 ስም፦ <b>Melaku Mebrate Tekle</b>\n\n"
-        f"📸 <b>ክፍያውን ፈጽመው እንደጨረሱ የክፍያውን ስክሪንሾት (Screenshot) እዚህ ላይ ይላኩ።</b>"
+        f"⚡ <b>የውስጥ መስመር ክፍያ ማረጋገጫ</b> ⚡\n\n"
+        f"🎯 <b>የመረጡት ቁጥር፦</b> ቁጥር {selected_num}\n"
+        f"💰 <b>የሚከፍሉት መጠን፦</b> 30 ብር\n\n"
+        f"📱 <b>የቴሌብር ስልክ ቁጥር፦</b> <code>{TELEBIRR_NUMBER}</code>\n"
+        f"👤 <b>ስም፦</b> Melaku Mebrate Tekle\n\n"
+        f"📸 እባክዎ ክፍያውን ፈጽመው እንደጨረሱ <b>የክፍያውን ስክሪንሾት (Screenshot)</b> እዚህ ላይ ይላኩ።"
     )
     
     pending_payments[user_id] = {
@@ -80,7 +137,17 @@ async def buy_number_handler(callback_query: types.CallbackQuery):
         "name": username,
         "main_msg_id": callback_query.message.message_id 
     }
-    await callback_query.message.answer(text=payment_instruction, parse_mode="HTML")
+    
+    try:
+        await bot.send_message(chat_id=user_id, text=payment_instruction, parse_mode="HTML")
+        await bot.send_message(chat_id=chat_id, text=f"📥 <b>@{callback_query.from_user.username or username}</b> ቁጥር {selected_num}ን ለመግዛት የክፍያ መመሪያ በውስጥ መስመር ተልኮለታል።")
+    except Exception:
+        # ተጫዋቹ ቦቱን Start ካላደረገው ግሩፑ ላይ መልዕክት ያሳያል
+        await callback_query.message.answer(
+            f"❌ <b>አቶ {username}፣ ቦቱን በውስጥ መስመር አላስነሱትም!</b>\n"
+            f"እባክዎ መጀመሪያ እዚህ ይጫኑ 👉 @{(await bot.get_me()).username} በመግባት <b>Start</b> ይበሉ፤ ከዚያ መልሰው ቁጥሩን ይጫኑ።",
+            parse_mode="HTML"
+        )
 
 @dp.callback_query(F.data.startswith("already_sold_"))
 async def already_sold_handler(callback_query: types.CallbackQuery):
@@ -90,7 +157,7 @@ async def already_sold_handler(callback_query: types.CallbackQuery):
 async def screenshot_receiver(message: types.Message):
     user_id = message.from_user.id
     if user_id not in pending_payments:
-        await message.reply("⚠️ እባክዎ መጀመሪያ ከላይ ቁጥር ይምረጡ፤ ከዚያ የስክሪንሾት ፎቶ ይላኩ።")
+        await message.reply("⚠️ እባክዎ መጀመሪያ ከግሩፑ ላይ ቁጥር ይምረጡ፤ ከዚያ የስክሪንሾት ፎቶ ይላኩ።")
         return
         
     user_data = pending_payments[user_id]
@@ -138,16 +205,17 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
     current_count = len(active_games[chat_id])
     await bot.send_message(
         chat_id=chat_id,
-        text=f"📣 <b>የደስታ ዜና!</b>\n👤 <b>{user_data['name']}</b> ቁጥር <b>{selected_num}</b>ን ገዝቷል።\n📊 የተሸጡ ትኬቶች፦ <b>{current_count}/10</b>",
+        text=f"📣 <b>የደስታ ዜና!</b>\n👤 <b>{user_data['name']}</b> ቁጥር <b>{selected_num}</b>ን በተሳካ ሁኔታ ገዝቷል።\n📊 የተሸጡ ትኬቶች፦ <b>{current_count}/10</b>",
         parse_mode="HTML"
     )
     
+    # 🔄 በዋናው ግሩፕ ላይ ሰሌዳው በሰዎች ስም ታድሶ እንዲወጣ ማድረግ
     try:
         updated_text = (
             "🎡 <b>እንኳን ወደ ዕድል እሽከርክሪት መድረክ በሰላም መጡ!</b> 🎡\n\n"
-            "💵 የትኬት ዋጋ፦ <b>30 ብር</b>\n"
-            f"👥 አሁን የተሸጡ ትኬቶች፦ <b>{current_count}/10</b>\n\n"
-            "ከ1 እስከ 10 ያለውን የዕድል ቁጥርዎን በመምረጥ ይሳተፉ፦"
+            "💵 <b>የአንድ ትኬት ዋጋ፦</b> 30 ብር\n"
+            f"👥 <b>የተሸጡ ትኬቶች፦</b> {current_count}/10\n\n"
+            "👇 ከታች ካለው ሰሌዳ ላይ የዕድል ቁጥርዎን በመምረጥ ይሳተፉ፦"
         )
         await bot.edit_message_text(
             text=updated_text,
@@ -162,9 +230,7 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption=f"✅ ተፈቅዷል! ቁጥር {selected_num} ተመዝግቧል።", reply_markup=None)
     
-    # 🎰 10 ሰው ሙሉ በሙሉ ሲሞላ እጣውን ያለምንም መቆራረጥ እዚህ ጋር ማስጀመር
     if current_count >= 10:
-        # በስተጀርባ (Background) በሰላም እንዲሰራ Background Task እናደርገዋለን
         asyncio.create_task(start_spinning_effect(chat_id))
 
 @dp.callback_query(F.data.startswith("adm_rj_"))
@@ -182,19 +248,16 @@ async def admin_reject_handler(callback_query: types.CallbackQuery):
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption="❌ ይህ ክፍያ ውድቅ ተደርጓል።", reply_markup=None)
 
-# 🛠 100% አስተማማኝ እና ፈጣን የሆነው የዕጣ አወጣጥ ተግባር
+# 🛠 ልብ ሰቀላ የጽሑፍ አኒሜሽን ያለው የዕጣ አወጣጥ ክፍል
 async def start_spinning_effect(chat_id: int):
-    # 1. አሸናፊውን ቁጥር ወዲያውኑ መምረጥ
     winner_number = str(random.randint(1, 10))
     
-    # 2. መልዕክት መላክ
     msg = await bot.send_message(
         chat_id=chat_id, 
         text="🚨 <b>10ቱም ትኬቶች በሙሉ ተሽጠዋል! የዕድል እሽከርክሪቱ አሁን ይጀምራል...</b>", 
         parse_mode="HTML"
     )
     
-    # 3. የጽሑፍ አኒሜሽን ልብ ሰቀላ (30 ሰከንድ) - ያለምንም ምስል መቆራረጥ በቀጥታ ይሰራል
     await asyncio.sleep(6)
     await msg.edit_text("🔄 <b>የዕድል መንኮራኩሩ በከፍተኛ ፍጥነት እየተሽከረከረ ነው... [ 🎰 SPINNING ]</b>", parse_mode="HTML")
     
@@ -208,7 +271,6 @@ async def start_spinning_effect(chat_id: int):
     await msg.edit_text("🎯 <b>አንድ ቁጥር ላይ ሊያርፍ ነው!... የመጨረሻ 5 ሰከንዶች!</b>", parse_mode="HTML")
     await asyncio.sleep(6)
     
-    # 4. ጨዋታውን ማፅዳትና ውጤቱን ማወጅ
     players = active_games.get(chat_id, {})
     winner_user = players.get(winner_number)
     
@@ -230,6 +292,10 @@ async def start_spinning_effect(chat_id: int):
     active_games[chat_id] = {}
 
 async def main():
+    # በቴሌግራም ሜኑ ላይ የቦት ትዕዛዞችን በቋሚነት መመዝገብ
+    await bot.set_my_commands([
+        BotCommand(command="start", description="🕹️ ጨዋታውን ይጀምሩ / ማደሻ")
+    ])
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
