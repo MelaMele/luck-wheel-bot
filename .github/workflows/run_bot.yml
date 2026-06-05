@@ -31,3 +31,6 @@ jobs:
         BOT_TOKEN: ${{ secrets.BOT_TOKEN }} 
       run: |
         python bot.py
+concurrency:
+  group: telemetry-bot
+  cancel-in-progress: true
