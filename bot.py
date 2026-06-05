@@ -20,12 +20,12 @@ TELEBIRR_NUMBER = "+251913064239"
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# የውስጥ ማከማቻ (ሁልጊዜ በዋናው ግሩፕ Chat ID ላይ ብቻ የተመሰረተ ይሆናል)
-active_games = {}     # {"target_group_id": {"1": {"user_id":..., "name":...}}}
-pending_payments = {} # {"user_id": {"chat_id": target_group_id, "num":..., "main_msg_id":...}}
+# የውስጥ ማከማቻ (በግሩፕ መታወቂያ ላይ የተመሰረተ)
+active_games = {}     # {"group_chat_id": {"1": {"user_id":..., "name":...}}}
+pending_payments = {} # {"user_id": {"chat_id": group_chat_id, "num":..., "main_msg_id":...}}
 
 def generate_keyboard(target_chat_id):
-    """የቁጥሮችን ሰሌዳ ለተወሰነ ግሩፕ ብቻ ለይቶ በትክክል የሚያዘጋጅ ተግባር"""
+    """የጨዋታውን ሰሌዳ ሁልጊዜ በትክክለኛው የግሩፕ ID ላይ ብቻ መስርቶ የሚያዘጋጅ ተግባር"""
     game = active_games.get(target_chat_id, {})
     buttons = []
     row = []
@@ -37,7 +37,7 @@ def generate_keyboard(target_chat_id):
             callback_data = f"already_sold_{i}"
         else:
             text = f"🔢 ቁጥር {i}"
-            callback_data = f"buy_{i}_{target_chat_id}" # የግሩፑን ID በዳታው ውስጥ ያቆየዋል
+            callback_data = f"buy_{i}_{target_chat_id}"
             
         row.append(InlineKeyboardButton(text=text, callback_data=callback_data))
         if i % 2 == 0: 
@@ -61,11 +61,17 @@ def get_main_reply_keyboard():
 async def start_handler(message: types.Message):
     chat_id = message.chat.id
     
-    # ቦቱ በግሩፕ ውስጥ ከሆነ የራሱን የግሩፕ ID ይይዛል፣ በውስጥ መስመር ከሆነ ግን ጨዋታ ለመጀመር መጀመሪያ ግሩፕ ውስጥ መሆን አለበት
+    # በውስጥ መስመር (DM) ከሆነ ቋሚ ምናሌውን ብቻ ያሳያል
     if message.chat.type == "private":
-        await message.answer("🕹️ እንኳን ወደ ዕድል እሽከርክሪት ቦት በሰላም መጡ! እባክዎ ጨዋታውን ለመጫወት ወደ መጫወቻ ግሩፑ ይግቡ።", reply_markup=get_main_reply_keyboard())
+        await message.answer(
+            "🕹️ <b>እንኳን ወደ ዕድል እሽከርክሪት ቦት በሰላም መጡ!</b>\n\n"
+            "⚠️ ጨዋታውን ለመጫወት እባክዎ ቦቱ ባለበት <b>የቴሌግራም ግሩፕ</b> ውስጥ ይግቡና ግሩፑ ላይ <b>/start</b> ይበሉ።", 
+            reply_markup=get_main_reply_keyboard(),
+            parse_mode="HTML"
+        )
         return
 
+    # በግሩፕ ውስጥ ከሆነ ጨዋታውን ያስጀምራል
     if chat_id not in active_games:
         active_games[chat_id] = {}
 
@@ -80,7 +86,7 @@ async def start_handler(message: types.Message):
 @dp.message(F.text == "🎰 አዲስ ጨዋታ ጀምር")
 async def menu_start_game(message: types.Message):
     if message.chat.type == "private":
-        await message.answer("⚠️ ጨዋታ መጀመር የሚቻለው በዋናው የቴሌግራም ግሩፕ ውስጥ ብቻ ነው!")
+        await message.answer("⚠️ ጨዋታ መጀመር የሚቻለው በዋናው የቴሌግራም ግሩፕ ውስጥ ብቻ ነው! እባክዎ ግሩፕ ውስጥ ይግቡ።")
     else:
         await start_handler(message)
 
@@ -90,7 +96,7 @@ async def menu_help(message: types.Message):
         "📖 <b>የአጫዋች መመሪያ፦</b>\n\n"
         "1️⃣ ግሩፑ ውስጥ ካሉት ቁጥሮች የሚፈልጉትን ይጫኑ።\n"
         "2️⃣ ቦቱ በውስጥ መስመር የክፍያ መመሪያ ይልክልዎታል።\n"
-        "3️⃣ በቴሌብር 30 ብር ከፈለው ስክሪንሾት ለቦቱ በውስጥ መስመር ይልካሉ።\n"
+        "3️⃣ በቴሌብር 30 ብር ከፍለው ስክሪንሾት ለቦቱ በውስጥ መስመር ይልካሉ።\n"
         "4️⃣ አስተዳዳሪው ሲያጸድቀው ቁጥሩ በግሩፑ ሰሌዳ ላይ በስምዎ ይዘጋል!\n"
         "5️⃣ 10ቱም ሲሞሉ ቦቱ እጣ አውጥቶ አሸናፊውን ይለያል።"
     )
@@ -109,10 +115,15 @@ async def menu_payment_info(message: types.Message):
 async def buy_number_handler(callback_query: types.CallbackQuery):
     parts = callback_query.data.split("_")
     selected_num = parts[1]
-    group_chat_id = int(parts[2]) # ሁልጊዜ መነሻውን የግሩፕ ID በትክክል ይይዛል
+    group_chat_id = int(parts[2]) 
     user_id = callback_query.from_user.id
     username = callback_query.from_user.full_name
     
+    # ቼክ፦ ቁጥሩ አስቀድሞ በሌላ ሰው ተገዝቶ እንደሆነ በግሩፑ ID ማረጋገጥ
+    if group_chat_id in active_games and selected_num in active_games[group_chat_id]:
+        await callback_query.answer("❌ ይቅርታ፣ ይህ ቁጥር አሁን በሌላ ሰው ተገዝቷል!", show_alert=True)
+        return
+
     if user_id in pending_payments:
         await callback_query.answer("⚠️ ቀደም ሲል የላኩት ክፍያ ማረጋገጫ በሂደት ላይ ነው! እባክዎ ይጠብቁ።", show_alert=True)
         return
@@ -128,7 +139,6 @@ async def buy_number_handler(callback_query: types.CallbackQuery):
         f"📸 እባክዎ ክፍያውን ፈጽመው ሲጨርሱ <b>የክፍያውን ስክሪንሾት (Screenshot)</b> እዚህ ላይ ይላኩ።"
     )
     
-    # እዚህ ጋር መረጃውን ከዋናው ግሩፕ ID (group_chat_id) ጋር እናገናኘዋለን
     pending_payments[user_id] = {
         "chat_id": group_chat_id, 
         "num": selected_num,
@@ -164,7 +174,7 @@ async def screenshot_receiver(message: types.Message):
     
     admin_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="✅ አጽдቅ (Approve)", callback_data=f"adm_ap_{user_id}"),
+            InlineKeyboardButton(text="✅ አጽድቅ (Approve)", callback_data=f"adm_ap_{user_id}"),
             InlineKeyboardButton(text="❌ ውድቅ አድርግ (Reject)", callback_data=f"adm_rj_{user_id}")
         ]
     ])
@@ -189,13 +199,13 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
         return
         
     user_data = pending_payments[target_user_id]
-    group_chat_id = user_data["chat_id"] # እውነተኛው መነሻ ግሩፕ ID
+    group_chat_id = user_data["chat_id"] 
     selected_num = user_data["num"]
     
     if group_chat_id not in active_games:
         active_games[group_chat_id] = {}
         
-    # ቁጥሩን በዋናው ግሩፕ ዳታቤዝ ላይ ብቻ መመዝገብ
+    # ቁጥሩን በዋናው ግሩፕ ዳታቤዝ ላይ መመዝገብ
     active_games[group_chat_id][selected_num] = {"user_id": target_user_id, "name": user_data["name"]}
     
     await bot.send_message(chat_id=target_user_id, text=f"🎉 <b>ክፍያዎ ተረጋግጧል!</b>\n🔢 <b>ቁጥር {selected_num}</b> በግሩፑ ሰሌዳ ላይ በስምዎ ተመዝግቧል። መልካም ዕድል!", parse_mode="HTML")
@@ -207,18 +217,16 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
         parse_mode="HTML"
     )
     
-    # በዋናው ግሩፕ ላይ ያለውን ሰሌዳ በገዛው ሰው ስም ማደስ
+    # 🔄 በዋናው ግሩፕ ላይ አዲስ የዘመነ ሰሌዳ መልሶ መላክ (ሰሌዳው እንዳይጠፋ ዋስትና ይሰጣል)
     try:
         updated_text = (
-            "🎡 <b>እንኳን ወደ ዕድል እሽከርክሪት መድረክ በሰላም መጡ!</b> 🎡\n\n"
-            "💵 <b>የአንድ ትኬት ዋጋ፦</b> 30 ብር\n"
-            f"👥 <b>የተሸጡ ትኬቶች፦</b> {current_count}/10\n\n"
-            "👇 ከታች ካለው ሰሌዳ ላይ የዕድል ቁጥርዎን በመምረጥ ይሳተፉ፦"
+            "🎡 <b>የዕድል እሽከርክሪት ወቅታዊ ሁኔታ</b> 🎡\n\n"
+            f"👥 <b>የተሸጡ ትኬቶች፦</b> {current_count}/10\n"
+            "👇 አሁኑኑ የእርስዎን ቁጥር በመምረጥ ይሳተፉ፦"
         )
-        await bot.edit_message_text(
-            text=updated_text,
+        await bot.send_message(
             chat_id=group_chat_id,
-            message_id=user_data["main_msg_id"],
+            text=updated_text,
             reply_markup=generate_keyboard(group_chat_id),
             parse_mode="HTML"
         )
