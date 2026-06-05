@@ -94,7 +94,7 @@ async def menu_start_game(message: types.Message):
 async def menu_help(message: types.Message):
     help_text = (
         "📖 <b>የአጫዋች መመሪያ፦</b>\n\n"
-        "1️⃣ ግሩፑ ውስጥ ካሉት ቁጥሮች የሚፈልጉትን ይጫኑ።\n"
+        "1️⃣ ግሩፑ ውስጥ ካሉት ቁጥሮች የሚፈልጉትን ይጫኑ。\n"
         "2️⃣ ቦቱ በውስጥ መስመር የክፍያ መመሪያ ይልክልዎታል።\n"
         "3️⃣ በቴሌብር 30 ብር ከፍለው ስክሪንሾት ለቦቱ በውስጥ መስመር ይልካሉ።\n"
         "4️⃣ አስተዳዳሪው ሲያጸድቀው ቁጥሩ በግሩፑ ሰሌዳ ላይ በስምዎ ይዘጋል!\n"
@@ -119,7 +119,6 @@ async def buy_number_handler(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
     username = callback_query.from_user.full_name
     
-    # ቼክ፦ ቁጥሩ አስቀድሞ በሌላ ሰው ተገዝቶ እንደሆነ በግሩፑ ID ማረጋገጥ
     if group_chat_id in active_games and selected_num in active_games[group_chat_id]:
         await callback_query.answer("❌ ይቅርታ፣ ይህ ቁጥር አሁን በሌላ ሰው ተገዝቷል!", show_alert=True)
         return
@@ -148,7 +147,7 @@ async def buy_number_handler(callback_query: types.CallbackQuery):
     
     try:
         await bot.send_message(chat_id=user_id, text=payment_instruction, parse_mode="HTML")
-        await bot.send_message(chat_id=group_chat_id, text=f"📥 <b>{username}</b> ቁጥር {selected_num}ን ለመግዛት የክፍያ መመሪያ በውስጥ መስመር ተልኮለታል።")
+        await bot.send_message(chat_id=group_chat_id, text=f"📥 <b>{username}</b> ቁጥር {selected_num}ን ለመግዛት የክፍያ መመሪያ በውስጥ መስመር ተልኮለታል።", parse_mode="HTML")
     except Exception:
         await callback_query.message.answer(
             f"❌ <b>አቶ {username}፣ ቦቱን በውስጥ መስመር አልከፈቱትም!</b>\n"
@@ -205,7 +204,6 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
     if group_chat_id not in active_games:
         active_games[group_chat_id] = {}
         
-    # ቁጥሩን በዋናው ግሩፕ ዳታቤዝ ላይ መመዝገብ
     active_games[group_chat_id][selected_num] = {"user_id": target_user_id, "name": user_data["name"]}
     
     await bot.send_message(chat_id=target_user_id, text=f"🎉 <b>ክፍያዎ ተረጋግጧል!</b>\n🔢 <b>ቁጥር {selected_num}</b> በግሩፑ ሰሌዳ ላይ በስምዎ ተመዝግቧል። መልካም ዕድል!", parse_mode="HTML")
@@ -217,7 +215,6 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
         parse_mode="HTML"
     )
     
-    # 🔄 በዋናው ግሩፕ ላይ አዲስ የዘመነ ሰሌዳ መልሶ መላክ (ሰሌዳው እንዳይጠፋ ዋስትና ይሰጣል)
     try:
         updated_text = (
             "🎡 <b>የዕድል እሽከርክሪት ወቅታዊ ሁኔታ</b> 🎡\n\n"
@@ -254,7 +251,6 @@ async def admin_reject_handler(callback_query: types.CallbackQuery):
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption="❌ ይህ ክፍያ ውድቅ ተደርጓል።", reply_markup=None)
 
-# የዕጣ አወጣጥ ክፍል
 async def start_spinning_effect(group_chat_id: int):
     winner_number = str(random.randint(1, 10))
     
