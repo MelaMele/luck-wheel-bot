@@ -61,11 +61,11 @@ def get_main_reply_keyboard():
 async def start_handler(message: types.Message):
     chat_id = message.chat.id
     
-    # በውስጥ መስመር (DM) ከሆነ ቋሚ ምናሌውን ብቻ ያሳያል
+    # በውስጥ መስመር (DM) ከሆነ ቋሚ ምናሌውን እና መመሪያውን ያሳያል
     if message.chat.type == "private":
         await message.answer(
             "🕹️ <b>እንኳን ወደ ዕድል እሽከርክሪት ቦት በሰላም መጡ!</b>\n\n"
-            "⚠️ ጨዋታውን ለመጫወት እባክዎ ቦቱ ባለበት <b>የቴሌግራም ግሩፕ</b> ውስጥ ይግቡና ግሩፑ ላይ <b>/start</b> ይበሉ።", 
+            "⚠️ ጨዋታውን ለመጫወት እባክዎ ቦቱ ባለበት <b>የቴሌግራም ግሩፕ</b> ውስጥ ይግቡና ግሩፑ ላይ <b>/start</b> ይበሉ። ከዚያ የቁጥር ሰሌዳው በግሩፑ ውስጥ ይወጣልዎታል!", 
             reply_markup=get_main_reply_keyboard(),
             parse_mode="HTML"
         )
@@ -86,7 +86,7 @@ async def start_handler(message: types.Message):
 @dp.message(F.text == "🎰 አዲስ ጨዋታ ጀምር")
 async def menu_start_game(message: types.Message):
     if message.chat.type == "private":
-        await message.answer("⚠️ ጨዋታ መጀመር የሚቻለው በዋናው የቴሌግራም ግሩፕ ውስጥ ብቻ ነው! እባክዎ ግሩፕ ውስጥ ይግቡ።")
+        await message.answer("⚠️ ጨዋታ መጀመር የሚቻለው በዋናው የቴሌግራም ግሩፕ ውስጥ ብቻ ነው! እባክዎ ግሩፕ ውስጥ በመግባት /start ይበሉ።")
     else:
         await start_handler(message)
 
@@ -173,7 +173,7 @@ async def screenshot_receiver(message: types.Message):
     
     admin_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="✅ አጽድቅ (Approve)", callback_data=f"adm_ap_{user_id}"),
+            InlineKeyboardButton(text="✅ အጽድቅ (Approve)", callback_data=f"adm_ap_{user_id}"),
             InlineKeyboardButton(text="❌ ውድቅ አድርግ (Reject)", callback_data=f"adm_rj_{user_id}")
         ]
     ])
@@ -215,6 +215,7 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
         parse_mode="HTML"
     )
     
+    # 🔄 በዋናው ግሩፕ ላይ ሰሌዳውን በፍጹም በማይበላሽ መልኩ እንደ አዲስ መላክ
     try:
         updated_text = (
             "🎡 <b>የዕድል እሽከርክሪት ወቅታዊ ሁኔታ</b> 🎡\n\n"
