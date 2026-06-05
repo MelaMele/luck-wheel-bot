@@ -103,7 +103,7 @@ async def menu_payment_info(message: types.Message):
         f"💳 <b>ትክክለኛ የክፍያ መረጃ፦</b>\n\n"
         f"📱 የቴሌብር ስልክ ቁጥር፦ <code>{TELEBIRR_NUMBER}</code>\n"
         f"👤 የተጠቃሚ ስም፦ <b>Melaku Mebrate Tekle</b>\n\n"
-        f"⚠️ ማሳሰቢያ፦ እባክዎ ክፍያ ሲፈጽሙ ስም መሳሳቱን ያረጋግጡ!"
+        f"⚠️ ማሳሰቢያ፦ እባክዎ ክፍያ ሲፈጽሙ ስም አለመሳሳቱን ያረጋግጡ!"
     )
     await message.answer(pay_text, parse_mode="HTML")
 
