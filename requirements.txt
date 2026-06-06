@@ -1,5 +1,3 @@
 aiogram==3.13.0
 
 pyTelegramBotAPI
-aiogram==3.13.1
-gspread==6.1.2
