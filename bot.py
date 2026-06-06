@@ -2,45 +2,32 @@ import asyncio
 import random
 import os
 from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command
-from aiogram.utils.deep_linking import create_start_link
-from aiogram.types import (
-    InlineKeyboardMarkup, 
-    InlineKeyboardButton, 
-    ReplyKeyboardMarkup, 
-    KeyboardButton,
-    BotCommand
-)
+from aiogram.filters import Command, CommandStart
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-
-# 🔐 ዋና ዋና መረጃዎች (የራስህን መረጃዎች እዚህ ላይ አስተካክል)
-ADMIN_CHAT_ID = 1065443252  
-TELEBIRR_NUMBER = "+251913064239" 
-GROUP_LINK = "https://t.me/Yechewatamenkurakur" # 🔗 የቴሌግራም ግሩፕህ ሊንክ እዚህ ይግባ
+ADMIN_CHAT_ID = 1065443252  # ያንተ የቴሌግራም መታወቂያ ቁጥር
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# የጋራ የውስጥ ማከማቻ (ሁልጊዜ የተመሳሰለ ነው)
-# ለአሁኑ ማሳያ የአንድ ግሩፕ መታወቂያ እንጠቀማለን (Multi-group እንዲሆን ከተፈለገ በ ID ይከፋፈላል)
-GAME_ROOM_ID = "main_game"
-active_games = {GAME_ROOM_ID: {}}     
-pending_payments = {} # {"user_id": {"num":..., "name":...}}
+# 🎰 በጊዜያዊ ሚሞሪ ላይ የሚቀመጥ የጨዋታ መረጃ
+active_games = {}     # {group_chat_id: { "ቁጥር": {"user_id":..., "name":...} }}
+pending_payments = {} # {user_id: {"num":..., "group_id":..., "name":...}}
 
-def generate_keyboard():
-    """ሁልጊዜ ከዋናው ዳታቤዝ ጋር የተመሳሰለ የቁጥሮች ሰሌዳ ያመነጫል"""
-    game = active_games[GAME_ROOM_ID]
+def generate_keyboard(group_id: int):
+    """የቁጥሮችን ወቅታዊ ሁኔታ ያሳያል"""
+    game = active_games.get(group_id, {})
     buttons = []
     row = []
     for i in range(1, 11):
         num_str = str(i)
         if num_str in game:
-            text = f"🔴 ቁጥር {i} (ተሽጧል)"
-            callback_data = f"already_sold_{i}"
+            text = f"🔴 {i} (ተያዟል)"
+            callback_data = f"sold_{i}"
         else:
             text = f"🟢 ቁጥር {i}"
-            callback_data = f"buy_num_{i}"
+            callback_data = f"buy_{i}_{group_id}"
             
         row.append(InlineKeyboardButton(text=text, callback_data=callback_data))
         if i % 2 == 0: 
@@ -48,105 +35,84 @@ def generate_keyboard():
             row = []
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def get_player_list_text():
-    """ወቅታዊ የተጫዋቾችን ዝርዝር ያሳያል"""
-    game = active_games[GAME_ROOM_ID]
-    list_text = "<b>📊 የእድለኛ ተሳታፊዎች ወቅታዊ ዝርዝር፦</b>\n"
-    list_text += "━━━━━━━━━━━━━━━━━━━\n"
-    for i in range(1, 11):
-        num_str = str(i)
-        if num_str in game:
-            list_text += f" {i} 🔴 <b>{game[num_str]['name']}</b>\n"
-        else:
-            list_text += f" {i} 🔓 <i>ነጻ ቁጥር (ክፍት)</i>\n"
-    list_text += "━━━━━━━━━━━━━━━━━━━"
-    return list_text
-
-@dp.message(Command("start"))
+@dp.message(CommandStart())
 async def start_handler(message: types.Message):
-    # ሴኩሪቲ፦ ይህ ጨዋታ የሚካሄደው በቦቱ የውስጥ መስመር ብቻ ነው
-    if message.chat.type != "private":
-        bot_info = await bot.get_me()
-        # ወደ ቦቱ የሚያስገባ ሊንክ በግሩፑ ላይ ይልካል
-        bot_link = f"https://t.me/{bot_info.username}?start=play"
-        await message.answer(
-            f"🎡 <b>ወደ ዕድል እሽከርክሪት ጨዋታ ለመግባት ከታች ያለውን በተን ይጫኑ፦</b>",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🕹️ አሁኑኑ ተጫወት", url=bot_link)]
-            ]),
-            parse_mode="HTML"
+    # በግል መስመር ከሆነ መመሪያ ያሳያል
+    if message.chat.type == "private":
+        help_text = (
+            "👋 <b>እንኳን ወደ ዕድል እሽከርክሪት ቦት በሰላም መጡ!</b>\n\n"
+            "🎰 ጨዋታውን ለመጫወት መጀመሪያ ቦቱ ወዳለበት <b>የቴሌግራም ግሩፕ</b> ይሂዱ።\n"
+            "ግሩፑ ውስጥ ገብተው /game ሲሉ የቁጥር ሰሌዳው ይወጣሎታል።"
         )
+        await message.answer(help_text, parse_mode="HTML")
         return
 
-    current_count = len(active_games[GAME_ROOM_ID])
+@dp.message(Command("game"))
+async def game_command_handler(message: types.Message):
+    """ግሩፕ ውስጥ ጨዋታውን መጀሪያ ቁልፍ"""
+    group_id = message.chat.id
+    if group_id not in active_games:
+        active_games[group_id] = {}
+        
+    current_count = len(active_games[group_id])
     welcome_text = (
-        "💎 <b>እንኳን ወደ ዕድል እሽከርክሪት ማዕከል በሰላም መጡ!</b> 💎\n\n"
-        f"💰 <b>የአንድ ትኬት ዋጋ፦</b> <code>30 ብር</code>\n"
-        f"🏆 <b>የአሸናፊው ሽልማት፦</b> <b>200 ብር በቀጥታ!</b>\n"
-        f"👥 <b>የተሸጡ ትኬቶች፦</b> 📊 <b>{current_count}/10</b>\n\n"
-        f"{get_player_list_text()}\n\n"
-        "👇 እባክዎ ከታች ያለውን ሰሌዳ በመጠቀም ክፍት የሆነ የዕድል ቁጥር ይምረጡ፦"
+        "🎡 <b>የዕድል እሽከርክሪት ጨዋታ ተጀምሯል!</b> 🎡\n\n"
+        "💰 <b>የአንድ ትኬት ዋጋ፦</b> <code>30 ብር</code>\n"
+        "🏆 <b>የአሸናፊው ሽልማት፦</b> <b>200 ብር በቀጥታ!</b>\n"
+        f"📊 <b>የተሸጡ ትኬቶች፦</b> <b>{current_count}/10</b>\n\n"
+        "👇 እባክዎ ከታች ካለው ሰሌዳ ላይ አንድ ክፍት የዕድል ቁጥር ይምረጡ፦"
     )
-    await message.answer(text=welcome_text, reply_markup=generate_keyboard(), parse_mode="HTML")
+    await message.answer(text=welcome_text, reply_markup=generate_keyboard(group_id), parse_mode="HTML")
 
-@dp.callback_query(F.data.startswith("buy_num_"))
+@dp.callback_query(F.data.startswith("buy_"))
 async def buy_number_handler(callback_query: types.CallbackQuery):
-    selected_num = callback_query.data.split("_")[2]
+    parts = callback_query.data.split("_")
+    selected_num = parts[1]
+    group_id = int(parts[2])
     user_id = callback_query.from_user.id
     username = callback_query.from_user.full_name
     
-    # ቼክ 1፦ ቁጥሩ ድጋሚ እንዳይገዛ በቅጽበት ማረጋገጫ
-    if selected_num in active_games[GAME_ROOM_ID]:
-        await callback_query.answer("❌ ይቅርታ፣ ይህ ቁጥር አሁን በሌላ ሰው ተገዝቷል! እባክዎ ሌላ ይምረጡ።", show_alert=True)
-        # ሰሌዳውን በቅጽበት ማደስ
-        await callback_query.message.edit_reply_markup(reply_markup=generate_keyboard())
-        return
-
-    if user_id in pending_payments:
-        await callback_query.answer("⚠️ ቀደም ሲል የላኩት ክፍያ ማረጋገጫ በሂደት ላይ ነው! እባክዎ ይጠብቁ።", show_alert=True)
+    # ቁጥሩ ድጋሚ መያዙን ቼክ ማድረግ
+    if selected_num in active_games.get(group_id, {}):
+        await callback_query.answer("❌ ይቅርታ፣ ይህ ቁጥር አሁን በሌላ ሰው ተገዝቷል!", show_alert=True)
         return
 
     await callback_query.answer()
     
+    # ለተጫዋቹ በውስጥ መስመር የክፍያ መመሪያ መላክ
     payment_instruction = (
         f"✨ <b>የክፍያ ማረጋገጫ ፎርም</b> ✨\n\n"
         f"🎯 <b>የመረጡት ቁጥር፦</b> <b>ቁጥር {selected_num}</b>\n"
-        f"💰 <b>የሚከፍሉት መጠን፦</b> <code>30 ብር</code>\n\n"
-        f"📱 <b>የቴሌብር ቁጥር፦</b> <code>{TELEBIRR_NUMBER}</code>\n"
-        f"👤 <b>ስም፦</b> Melaku Mebrate Tekle\n\n"
-        f"📸 እባክዎ ክፍያውን ፈጽመው ሲጨርሱ <b>የክፍያውን ስክሪንሾት (Screenshot) ፎቶ</b> ብቻ እዚህ ላይ ይላኩ።"
+        f"💰 <b>የሚከፍሉት መጠን፦</b> <code>30 ብር</code>\n"
+        f"📱 <b>የቴሌብር ቁጥር፦</b> <code>+251913064239</code>\n\n"
+        f"📸 እባክዎ ክፍያውን ፈጽመው ሲጨርሱ <b>የክፍያውን ስክሪንሾት (Screenshot) ፎቶ</b> እዚህ ላይ ይላኩ።"
     )
     
-    pending_payments[user_id] = {
-        "num": selected_num,
-        "name": username
-    }
+    pending_payments[user_id] = {"num": selected_num, "group_id": group_id, "name": username}
     
-    await callback_query.message.answer(payment_instruction, parse_mode="HTML")
+    try:
+        await bot.send_message(chat_id=user_id, text=payment_instruction, parse_mode="HTML")
+        await callback_query.message.answer(f"📩 <b>{username}</b> የክፍያ መመሪያው በውስጥ መስመር (DM) ተልኮልዎታል። እባክዎ ቼክ ያድርጉ!")
+    except Exception:
+        await callback_query.message.answer(f"⚠️ <b>{username}</b> ቦቱን በመጀመሪያ Start አላደረጉትም። እባክዎ @your_bot_username ላይ ገብተው Start ይበሉ!")
 
-@dp.callback_query(F.data.startswith("already_sold_"))
-async def already_sold_handler(callback_query: types.CallbackQuery):
-    await callback_query.answer("❌ ይህ ቁጥር ቀደም ብሎ ተሽጧል! እባክዎ ሌላ አረንጓዴ ቁጥር ይምረጡ።", show_alert=True)
+@dp.callback_query(F.data.startswith("sold_"))
+async def sold_handler(callback_query: types.CallbackQuery):
+    await callback_query.answer("❌ ይህ ቁጥር ተሽጧል! እባክዎ ሌላ ይምረጡ።", show_alert=True)
 
-# ሴኩሪቲ፦ ፎቶ ብቻ ነው የሚቀበለው (ቪዲዮ፣ ፅሁፍ ወይም ሊንክ አይቀበልም)
 @dp.message(F.photo)
 async def screenshot_receiver(message: types.Message):
     user_id = message.from_user.id
     if user_id not in pending_payments:
-        await message.reply("⚠️ እባክዎ መጀመሪያ ቁጥር ይምረጡ፤ ከዚያ የስክሪንሾት ፎቶ ይላኩ።")
         return
         
     user_data = pending_payments[user_id]
-    selected_num = user_data["num"]
     
-    await message.reply(
-        "📥 <b>የክፍያ ስክሪንሾትዎ ደርሶናል። በአስተዳዳሪው ተረጋግጦ ቁጥሩ እስኪመዘገብ እባክዎ በትዕግስት ይጠብቁ! 🕒</b>", 
-        parse_mode="HTML"
-    )
+    await message.reply("📥 <b>ስክሪንሾትዎ ደርሶናል። በአስተዳዳሪው ተረጋግጦ ቁጥሩ እስኪመዘገብ እባክዎ በትዕግስት ይጠብቁ! 🕒</b>", parse_mode="HTML")
     
     admin_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="✅ አጽдቅ (Approve)", callback_data=f"adm_ap_{user_id}"),
+            InlineKeyboardButton(text="✅ አጽድቅ (Approve)", callback_data=f"adm_ap_{user_id}"),
             InlineKeyboardButton(text="❌ ውድቅ አድርግ (Reject)", callback_data=f"adm_rj_{user_id}")
         ]
     ])
@@ -154,84 +120,80 @@ async def screenshot_receiver(message: types.Message):
     await bot.send_photo(
         chat_id=ADMIN_CHAT_ID,
         photo=message.photo[-1].file_id,
-        caption=f"🔔 <b>አዲስ የክፍያ ማረጋገጫ!</b>\n\n👤 <b>ተጫዋች፦</b> {user_data['name']}\n🔢 <b>ቁጥር፦</b> <b>ቁጥር {selected_num}</b>",
+        caption=f"🔔 <b>አዲስ ክፍያ!</b>\n👤 <b>ተጫዋች፦</b> {user_data['name']}\n🔢 <b>ቁጥር፦</b> {user_data['num']}",
         reply_markup=admin_keyboard,
         parse_mode="HTML"
     )
 
-@dp.message()
-async def block_other_messages(message: types.Message):
-    """ሴኩሪቲ፦ ከፎቶ ውጪ የሚላኩ የማይገቡ ጽሑፎችንና ፋይሎችን በሙሉ ውድቅ ማድረጊያ"""
-    if message.chat.type == "private":
-        await message.reply("⚠️ እባክዎ የክፍያ ስክሪንሾት (የፎቶ ፋይል) ብቻ ይላኩ። ሌላ አይነት ፋይል ወይም ጽሑፍ ሲስተሙ አይቀበልም።")
-
 @dp.callback_query(F.data.startswith("adm_ap_"))
 async def admin_approve_handler(callback_query: types.CallbackQuery):
-    if callback_query.from_user.id != ADMIN_CHAT_ID:
-        await callback_query.answer("❌ ይህ ትዕዛዝ ለአስተዳዳሪው ብቻ የተፈቀደ ነው!", show_alert=True)
-        return
-        
     target_user_id = int(callback_query.data.split("_")[2])
     if target_user_id not in pending_payments:
         await callback_query.answer("❌ ይህ ጥያቄ ቀደም ብሎ ምላሽ አግኝቷል።")
         return
         
     user_data = pending_payments[target_user_id]
+    group_id = user_data["group_id"]
     selected_num = user_data["num"]
     
-    # በዋናው የጋራ ዳታቤዝ ላይ ቁጥሩን መቆለፍ
-    active_games[GAME_ROOM_ID][selected_num] = {"user_id": target_user_id, "name": user_data["name"]}
+    active_games[group_id][selected_num] = {"user_id": target_user_id, "name": user_data["name"]}
+    current_count = len(active_games[group_id])
     
-    # 🔗 ወደ ግሩፑ መመለሻ በተን ማዘጋጀት
-    back_to_group_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏃‍♂️ ወደ ግሩፑ ተመለስ", url=GROUP_LINK)]
-    ])
+    await bot.send_message(chat_id=target_user_id, text=f"🎉 ክፍያዎ ተረጋግጧል! <b>ቁጥር {selected_num}</b> በስምዎ ተመዝግቧል። መልካም እድል! 🍀", parse_mode="HTML")
+    await bot.send_message(chat_id=group_id, text=f"📣 <b>{user_data['name']}</b> ቁጥር <b>{selected_num}</b>ን ገዝቷል!\n📊 የተሸጡ ትኬቶች፦ <b>{current_count}/10</b>", parse_mode="HTML")
     
-    await bot.send_message(
-        chat_id=target_user_id, 
-        text=f"🎉 <b>ክፍያዎ ተረጋግጧል!</b>\n🔢 <b>ቁጥር {selected_num}</b> በስምዎ ተመዝግቧል። አሁኑኑ ወደ ግሩፑ በመመለስ የጨዋታውን ሂደት ይከታተሉ! 🍀", 
-        reply_markup=back_to_group_kb,
-        parse_mode="HTML"
-    )
-    
-    current_count = len(active_games[GAME_ROOM_ID])
-    
-    # በዋናው ግሩፕ ላይ ማስታወቂያ መላክ
-    try:
-        await bot.send_message(
-            chat_id=ADMIN_CHAT_ID, # ወይም እዚህ ላይ የግሩፕህን ቻት መታወቂያ ማድረግ ትችላለህ
-            text=f"📣 <b>የደስታ ዜና!</b>\n👤 <b>{user_data['name']}</b> ቁጥር <b>{selected_num}</b>ን በይፋ ገዝቷል።\n📊 የተሸጡ ትኬቶች፦ <b>{current_count}/10</b>",
-            parse_mode="HTML"
-        )
-    except Exception:
-        pass
-        
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption=f"✅ ተፈቅዷል! ቁጥር {selected_num} ተመዝግቧል።", reply_markup=None)
     
     if current_count >= 10:
-        # እዚህ ላይ የርችት እጣ ማውጫው ተግባር ይቀጥላል
-        pass
+        await start_spinning_effect(group_id)
 
 @dp.callback_query(F.data.startswith("adm_rj_"))
 async def admin_reject_handler(callback_query: types.CallbackQuery):
-    if callback_query.from_user.id != ADMIN_CHAT_ID:
-        await callback_query.answer("❌ ይህ ትዕዛዝ ለአስተዳዳሪው ብቻ የተፈቀደ ነው!", show_alert=True)
-        return
-        
     target_user_id = int(callback_query.data.split("_")[2])
     if target_user_id not in pending_payments:
-        await callback_query.answer()
         return
-        
-    await bot.send_message(chat_id=target_user_id, text="❌ <b>ክፍያዎ ውድቅ ተደርጓል!</b>\nየላኩት ስክሪንሾት ትክክለኛ አይደለም።", parse_mode="HTML")
+    await bot.send_message(chat_id=target_user_id, text="❌ <b>ክፍያዎ ውድቅ ተደርጓል!</b> እባክዎ ትክክለኛውን ስክሪንሾት እንደገና ይላኩ።", parse_mode="HTML")
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption="❌ ይህ ክፍያ ውድቅ ተደርጓል።", reply_markup=None)
 
+async def start_spinning_effect(group_chat_id: int):
+    """የርችት ድምቀት ያለው አውቶሜትድ እጣ ማውጫ"""
+    winner_number = str(random.randint(1, 10))
+    large_numbers = {"1": "️⃣1️⃣", "2": "️⃣2️⃣", "3": "️⃣3️⃣", "4": "️⃣4️⃣", "5": "️⃣5️⃣", "6": "️⃣6️⃣", "7": "️⃣7️⃣", "8": "️⃣8️⃣", "9": "️⃣9️⃣", "10": "🔟"}
+    big_num = large_numbers.get(winner_number, winner_number)
+
+    msg = await bot.send_message(chat_id=group_chat_id, text="🚨 <b>10ቱም ትኬቶች ተሽጠዋል! የዕድል መንኮራኩሩ አሁን ይጀምራል...</b>", parse_mode="HTML")
+    await asyncio.sleep(3)
+    await msg.edit_text("🔄 <b>የዕድል መንኮራኩሩ በከፍተኛ ፍጥነት እየተሽከረከረ ነው... [ 🎰 SPINNING ]</b>", parse_mode="HTML")
+    await asyncio.sleep(3)
+    await msg.edit_text("🎡 <b>መንኮራኩሩ ፍጥነቱን ቀስ በቀስ እየቀነሰ ነው... 👀</b>", parse_mode="HTML")
+    await asyncio.sleep(3)
+    
+    players = active_games.get(group_chat_id, {})
+    winner_user = players.get(winner_number)
+    
+    if winner_user:
+        result_text = (
+            f"🎆✨🎉 <b>እጣው በይፋ ወጥቷል!</b> 🎉✨🎆\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🎰 <b>የመጣው የዕድል ቁጥር፦</b>\n"
+            f"👇 👇 👇 👇 👇 👇 👇\n"
+            f"✨✨✨✨✨✨✨✨✨\n"
+            f"⚡️⚡️  <b>{big_num}</b>  ⚡️⚡️\n"
+            f"✨✨✨✨✨✨✨✨✨\n\n"
+            f"👑 <b>የዚህ ዙር ታላቅ ሻምፒዮን፦</b> <a href='tg://user?id={winner_user['user_id']}'>{winner_user['name']}</a>\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 <b>የ 200 ብር</b> የሽልማት ገንዘብዎ በቀጥታ ይላክሎታል። እንኳን ደስ አለዎት! 🎁"
+        )
+    else:
+        result_text = f"🎰 ያረፈበት ቁጥር፦ <b>{big_num}</b> ነበር። ግን ማንም ስላልገዛው አሸናፊ የለም።"
+        
+    await msg.edit_text(text=result_text, parse_mode="HTML")
+    active_games[group_chat_id] = {}
+
 async def main():
-    await bot.set_my_commands([
-        BotCommand(command="start", description="🕹️ ጨዋታውን ይጀምሩ")
-    ])
+    await bot.set_my_commands([BotCommand(command="game", description="🎰 ጨዋታውን ይጀምሩ")])
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
