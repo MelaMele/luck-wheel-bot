@@ -16,7 +16,7 @@ GROUP_LINK = "https://t.me/Yechewatamenkurakur"
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# 📊 የጨዋታ ክፍሎች መዋቅር (የእጣ ብዛት እና የሽልማት ስሌት ከነኮሚሽኑ)
+# 📊 የጨዋታ ክፍሎች መዋቅር
 ROOMS = {
     "30": {"name": "🥉 የነሐስ ክፍል (30 ብር)", "price": 30, "max_players": 10, "prize": 250},
     "50": {"name": "🥈 የብር ክፍል (50 ብር)", "price": 50, "max_players": 5, "prize": 200},
@@ -24,12 +24,13 @@ ROOMS = {
 }
 
 # 🗄️ በGitHub ላይ ብቻ የሚቀመጡ የውስጥ ዳታቤዞች
-active_games = {"30": {}, "50": {}, "100": {}} # {room_id: {num_str: {user_id, name}}}
-pending_payments = {} # {"user_id": {"num":..., "room":..., "name":...}}
+active_games = {"30": {}, "50": {}, "100": {}} 
+pending_payments = {} 
 
 user_wallets = {}     
 user_play_counts = {} 
-referred_users = {}   
+referred_users = {}   # {"የተጋበዘው_id": "የጋባዡ_id"}
+rewarded_referrals = set() # 🛑 አንድ ሰው ከአንድ ሰው በላይ ድጋሚ ኮሚሽን እንዳይበላ መከላከያ
 
 def check_and_create_user(user_id: int):
     if user_id not in user_wallets:
@@ -40,7 +41,6 @@ def check_and_create_user(user_id: int):
 # --- 📱 የቁልፍ ሰሌዳዎች (Keyboards) ---
 
 def generate_rooms_keyboard():
-    """የክፍሎችን መምረጫ ሰሌዳ ያዘጋጃል"""
     buttons = []
     for room_id, info in ROOMS.items():
         current_count = len(active_games[room_id])
@@ -54,7 +54,6 @@ def generate_rooms_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def generate_numbers_keyboard(room_id: str):
-    """ለእያንዳንዱ ክፍል የቁጥር መምረጫ ሰሌዳ ያመነጫል"""
     game = active_games[room_id]
     max_players = ROOMS[room_id]["max_players"]
     buttons = []
@@ -78,7 +77,6 @@ def generate_numbers_keyboard(room_id: str):
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def get_player_list_text(room_id: str):
-    """የተመረጠውን ክፍል ወቅታዊ ሁኔታ ያሳያል"""
     game = active_games[room_id]
     info = ROOMS[room_id]
     list_text = f"<b>📊 የ{info['name']} ተሳታፊዎች ዝርዝር፦</b>\n"
@@ -111,22 +109,12 @@ async def start_handler(message: types.Message):
     user_id = message.from_user.id
     check_and_create_user(user_id)
     
-    # 👥 የሪፈራል ሲስተም (ወደ 3 ብር የተቀየረ)
+    # 👥 የሪፈራል ትስስር ማስታወሻ መያዣ (ብር እዚህ ጋር አይጨመርም!)
     args = message.text.split()
     if len(args) > 1 and args[1].startswith("ref_"):
         referrer_id = int(args[1].replace("ref_", ""))
         if referrer_id != user_id and user_id not in referred_users:
             referred_users[user_id] = referrer_id
-            check_and_create_user(referrer_id)
-            user_wallets[referrer_id] += 3.0 # 3 ብር ኮሚሽን
-            try:
-                await bot.send_message(
-                    chat_id=referrer_id,
-                    text=f"🎁 <b>የአፍሊየት ሽልማት!</b> የጋበዙት ሰው ቦቱን ስለቀላቀለ <b>3 ብር</b> ዋሌትዎ ላይ ተጨምሯል!",
-                    parse_mode="HTML"
-                )
-            except Exception:
-                pass
 
     welcome_text = (
         "💎 <b>እንኳን ወደ ዕድል እሽከርክሪት ማዕከል በሰላም መጡ!</b> 💎\n\n"
@@ -222,7 +210,7 @@ async def screenshot_receiver(message: types.Message):
         parse_mode="HTML"
     )
 
-# --- 👑 የአድሚን ማጽደቂያ እና የታማኝነት ጉርሻ ---
+# --- 👑 የአድሚን ማጽደቂያ፣ የታማኝነት ጉርሻ እና የሪፈራል ክፍያ ---
 
 @dp.callback_query(F.data.startswith("adm_ap_"))
 async def admin_approve_handler(callback_query: types.CallbackQuery):
@@ -245,6 +233,25 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
     check_and_create_user(target_user_id)
     user_play_counts[target_user_id] += 1  
     
+    # 👥 💰 የሪፈራል ክፍያ ማረጋገጫ (ከተከፈለ በኋላ ብቻ የሚሰጥ)
+    ref_text = ""
+    if target_user_id in referred_users and target_user_id not in rewarded_referrals:
+        referrer_id = referred_users[target_user_id]
+        check_and_create_user(referrer_id)
+        
+        user_wallets[referrer_id] += 3.0 # ለጋባዡ 3 ብር ኮሚሽን አሁን ተጨመረ!
+        rewarded_referrals.add(target_user_id) # ምልክት ይደረግበታል (ድጋሚ እንዳይከፈል)
+        
+        try:
+            await bot.send_message(
+                chat_id=referrer_id,
+                text=f"🎁 <b>የአፍሊየት ኮሚሽን ገቢ!</b> የጋበዙት ሰው (<code>{user_data['name']}</code>) የመጀመሪያ ጨዋታውን ስለተጫወተ <b>3 ብር</b> ዋሌትዎ ላይ በስኬት ተጨምሯል!",
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+    
+    # 🎖️ የታማኝነት ጉርሻ (Loyalty)
     loyalty_text = ""
     if user_play_counts[target_user_id] % 5 == 0:
         user_wallets[target_user_id] += 10.0
@@ -265,7 +272,7 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
     
     try:
         await bot.send_message(
-            chat_id=ADMIN_CHAT_ID, # ግሩፑ ውስጥ ማስታወቂያ ለመላክ እዚህ ላይ የግሩፕ ID መተካት ትችላለህ
+            chat_id=ADMIN_CHAT_ID, 
             text=f"📣 <b>የደስታ ዜና!</b>\n👤 <b>{user_data['name']}</b> በ{info['name']} ቁጥር <b>{selected_num}</b>ን በይፋ ገዝቷል።\n📊 የተሸጡ ትኬቶች፦ <b>{current_count}/{info['max_players']}</b>",
             parse_mode="HTML"
         )
@@ -313,7 +320,7 @@ async def start_spinning_effect(chat_id: int, room_id: str):
         result_text = f"🎰 ያረፈበት ቁጥር፦ <b>ቁጥር {winner_number}</b> ነበር። ግን ማንም ስላልገዛው አሸናፊ የለም።"
         
     await msg.edit_text(text=result_text, parse_mode="HTML")
-    active_games[room_id] = {} # ክፍሉን ለቀጣይ ዙር ማጽዳት
+    active_games[room_id] = {} 
 
 # --- 💳 ዋሌት እና ሪፈራል እይታ ---
 
@@ -339,7 +346,7 @@ async def view_ref_handler(callback_query: types.CallbackQuery):
     ref_text = (
         f"🤝 <b>የመጋበዣ (Affiliate) ማዕከል</b>\n\n"
         f"👥 <b>የጋበዟቸው ሰዎች ብዛት፦</b> <code>{total_referred} ሰው</code>\n"
-        f"🎁 <b>የግብዣ ስጦታ፦</b> ለእያንዳንዱ አዲስ ሰው <b>3 ብር</b> ያገኛሉ!\n\n"
+        f"🎁 <b>የግብዣ ስጦታ፦</b> የጋበዙት ሰው መጥቶ <u>የመጀመሪያ ጨዋታውን ሲጫወት</u> <b>3 ብር</b> ያገኛሉ!\n\n"
         f"🔗 <b>የመጋበዣ ሊንክዎ፦</b>\n<code>{ref_link}</code>"
     )
     await callback_query.answer()
