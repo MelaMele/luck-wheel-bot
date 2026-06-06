@@ -9,6 +9,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 # 🔐 ዋና ዋና መረጃዎች
 ADMIN_CHAT_ID = 1065443252  
+GROUP_CHAT_ID = -1003866369018  
 TELEBIRR_NUMBER = "0920628769" 
 TELEBIRR_NAME = "Tsige Tulu"
 GROUP_LINK = "https://t.me/Yechewatamenkurakur" 
@@ -109,7 +110,7 @@ async def start_handler(message: types.Message):
     user_id = message.from_user.id
     check_and_create_user(user_id)
     
-    # 👥 የሪፈራል ትስስር ማስታወሻ መያዣ (ብር እዚህ ጋር አይጨመርም!)
+    # 👥 የሪፈራል ትስስር ማስታወሻ መያዣ
     args = message.text.split()
     if len(args) > 1 and args[1].startswith("ref_"):
         referrer_id = int(args[1].replace("ref_", ""))
@@ -210,7 +211,7 @@ async def screenshot_receiver(message: types.Message):
         parse_mode="HTML"
     )
 
-# --- 👑 የአድሚን ማጽደቂያ፣ የታማኝነት ጉርሻ እና የሪፈራል ክፍያ ---
+# --- 👑 የአድሚን ማጽደቂያ እና ማስታወቂያዎች ---
 
 @dp.callback_query(F.data.startswith("adm_ap_"))
 async def admin_approve_handler(callback_query: types.CallbackQuery):
@@ -233,14 +234,13 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
     check_and_create_user(target_user_id)
     user_play_counts[target_user_id] += 1  
     
-    # 👥 💰 የሪፈራል ክፍያ ማረጋገጫ (ከተከፈለ በኋላ ብቻ የሚሰጥ)
-    ref_text = ""
+    # 👥 💰 የሪፈራል ክፍያ ማረጋገጫ
     if target_user_id in referred_users and target_user_id not in rewarded_referrals:
         referrer_id = referred_users[target_user_id]
         check_and_create_user(referrer_id)
         
-        user_wallets[referrer_id] += 3.0 # ለጋባዡ 3 ብር ኮሚሽን አሁን ተጨመረ!
-        rewarded_referrals.add(target_user_id) # ምልክት ይደረግበታል (ድጋሚ እንዳይከፈል)
+        user_wallets[referrer_id] += 3.0
+        rewarded_referrals.add(target_user_id)
         
         try:
             await bot.send_message(
@@ -271,19 +271,24 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
     current_count = len(active_games[room_id])
     
     try:
-        await bot.send_message(
-            chat_id=ADMIN_CHAT_ID, 
-            text=f"📣 <b>የደስታ ዜና!</b>\n👤 <b>{user_data['name']}</b> በ{info['name']} ቁጥር <b>{selected_num}</b>ን በይፋ ገዝቷል።\n📊 የተሸጡ ትኬቶች፦ <b>{current_count}/{info['max_players']}</b>",
-            parse_mode="HTML"
-        )
+        await callback_query.message.edit_caption(caption=f"✅ ተፈቅዷል! ቁጥር {selected_num} ተመዝግቧል።", reply_markup=None)
     except Exception:
         pass
+
+    # 📣 በቀጥታ ወደ ቴሌግራም ግሩፑ ማስታወቂያ መላኪያ
+    try:
+        await bot.send_message(
+            chat_id=GROUP_CHAT_ID, 
+            text=f"📣 <b>አዲስ ተሳታፊ ተመዝግቧል!</b>\n━━━━━━━━━━━━━━━━━━━━━━\n👤 <b>ተጫዋች፦</b> {user_data['name']}\n🎪 <b>ክፍል፦</b> {info['name']}\n🔢 <b>የመረጡት ቁጥር፦</b> <b>ቁጥር {selected_num}</b>\n📊 <b>የተሸጡ ትኬቶች፦</b> <b>{current_count}/{info['max_players']}</b>\n━━━━━━━━━━━━━━━━━━━━━━\n🕹️ <i>ለመሳተፍ ቦቱን በውስጥ መስመር ያናግሩት!</i>",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        print(f"Error: {e}")
         
     del pending_payments[target_user_id]
-    await callback_query.message.edit_caption(caption=f"✅ ተፈቅዷል! ቁጥር {selected_num} ተመዝግቧል።", reply_markup=None)
     
     if current_count >= info["max_players"]:
-        await start_spinning_effect(ADMIN_CHAT_ID, room_id)
+        await start_spinning_effect(GROUP_CHAT_ID, room_id)
 
 @dp.callback_query(F.data.startswith("adm_rj_"))
 async def admin_reject_handler(callback_query: types.CallbackQuery):
@@ -293,16 +298,16 @@ async def admin_reject_handler(callback_query: types.CallbackQuery):
     del pending_payments[target_user_id]
     await callback_query.message.edit_caption(caption="❌ ይህ ክፍያ ውድቅ ተደርጓል።", reply_markup=None)
 
-# --- 🎡 አውቶሜትድ የዕድል እሽከርክሪት ---
+# --- 🎡 አውቶሜትድ የዕድል እሽከርክሪት (በግሩፑ ውስጥ) ---
 
 async def start_spinning_effect(chat_id: int, room_id: str):
     info = ROOMS[room_id]
     winner_number = str(random.randint(1, info["max_players"]))
     
     msg = await bot.send_message(chat_id=chat_id, text=f"🚨 <b>የ{info['name']} ሁሉም ትኬቶች ተሽጠዋል! የዕድል መንኮራኩሩ አሁን ይጀምራል...</b>", parse_mode="HTML")
-    await asyncio.sleep(2)
+    await asyncio.sleep(3)
     await msg.edit_text("🔄 <b>የዕድል መንኮራኩሩ በከፍተኛ ፍጥነት እየተሽከረከረ ነው... [ 🎰 SPINNING ]</b>", parse_mode="HTML")
-    await asyncio.sleep(2)
+    await asyncio.sleep(3)
     
     players = active_games[room_id]
     winner_user = players.get(winner_number)
@@ -352,6 +357,42 @@ async def view_ref_handler(callback_query: types.CallbackQuery):
     await callback_query.answer()
     await callback_query.message.answer(ref_text, parse_mode="HTML")
 
+# --- 📢 በየ 30 ደቂቃው የሚላኩ አውቶሜትድ አነሳሽ ማስታወቂያዎች ---
+
+async def send_promotions():
+    bot_info = await bot.get_me()
+    bot_link = f"https://t.me/{bot_info.username}?start=ad"
+    
+    # 📝 3 የተለያዩ የማስታወቂያ ይዘቶች
+    ads = [
+        f"👥 <b>ጓደኞችዎን እየጋበዙ ነው?</b>\n\nየእርስዎን ልዩ የመጋበዣ ሊንክ ከቦቱ ውስጥ በመውሰድ ለጓደኞችዎ ያጋሩ! እነሱ መጥተው የመጀመሪያ ጨዋታቸውን ሲጫወቱ የእርስዎ የ <b>3 ብር</b> ኮሚሽን በራስ-ሰር ዋሌትዎ ላይ ይገባል! 🎁\n\n🔗 ቦቱን ለማግኘት ከታች ያለውን በተን ይጫኑ።",
+        
+        f"🎖️ <b>ማሳሰቢያ ለተጫዋቾቻችን!</b>\n\nበእኛ ቦት ላይ በቋሚነት ለሚጫወቱ ታማኝ ደንበኞች ልዩ ስጦታ አዘጋጅተናል። <b>5 ጊዜ</b> በተጫወቱ ቁጥር የ <b>10 ብር የዋሌት ስጦታ</b> ያገኛሉ! 🎰\n\nይጫወቱ፣ ያሸንፉ፣ ተጨማሪ ጉርሻዎችን ይሰብስቡ! 🚀",
+        
+        f"🎡 <b>ዕድልዎን ለመሞከር እና ፈጣን የቴሌብር ሽልማቶችን ለማሸነፍ ዝግጁ ነዎት?</b>\n\n🥉 የነሐስ፣ 🥈 የብር እና 🥇 የወርቅ ክፍሎችን በመቀላቀል የአሸናፊነት እጣዎን ይያዙ! ጨዋታው ሙሉ በሙሉ ግልጽ እና ታማኝ በሆነ ሲስተም የሚመራ ነው። \n\n🕹️ <b>አሁኑኑ መጫወት ለመጀመር ከታች ያለውን ቁልፍ ይጫኑ፦</b>"
+    ]
+    
+    # ሰዎችን በቀጥታ ወደ ቦቱ የሚወስድ በተን
+    inline_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🕹️ ቦቱን በውስጥ መስመር አናግር", url=bot_link)]
+    ])
+    
+    await asyncio.sleep(60) # ቦቱ እንደተነሳ ግሩፑ እንዳይጨናነቅ 1 ደቂቃ ይጠብቅ
+    
+    while True:
+        for ad_text in ads:
+            try:
+                await bot.send_message(
+                    chat_id=GROUP_CHAT_ID,
+                    text=ad_text,
+                    reply_markup=inline_kb,
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                print(f"የማስታወቂያ ስህተት፦ {e}")
+            
+            await asyncio.sleep(1800) # ⏳ በትክክል ለ 30 ደቂቃ (1800 ሰከንድ) ይጠብቃል!
+
 @dp.message()
 async def block_other_messages(message: types.Message):
     if message.chat.type == "private":
@@ -359,6 +400,10 @@ async def block_other_messages(message: types.Message):
 
 async def main():
     await bot.set_my_commands([BotCommand(command="start", description="🕹️ ጨዋታውን ይጀምሩ")])
+    
+    # ⚙️ የማስታወቂያ ፕሮግራሙን በጀርባ (Task) እንዲነሳ የማድረጊያ መዋቅር
+    asyncio.create_task(send_promotions())
+    
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
