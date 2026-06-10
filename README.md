@@ -1,1 +1,0 @@
-# luck-wheel-bot
