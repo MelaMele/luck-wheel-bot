@@ -1,6 +1,7 @@
 import asyncio
 import random
 import os
+import json
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
@@ -14,6 +15,9 @@ TELEBIRR_NUMBER = "0920628769"
 TELEBIRR_NAME = "Tsige Tulu"
 GROUP_LINK = "https://t.me/Yechewatamenkurakur" 
 
+# 🌐 የዌብ አፕሊኬሽንህ ሊንክ (በትክክል መተካቱን አረጋግጥ)
+WEB_APP_URL = "https://melamele.github.io/mela-wheel-app/"
+
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
@@ -24,72 +28,20 @@ ROOMS = {
     "100": {"name": "🥇 የወርቅ ክፍል (100 ብር)", "price": 100, "max_players": 5, "prize": 400}
 }
 
-# 🗄️ በGitHub ላይ ብቻ የሚቀመጡ የውስጥ ዳታቤዞች
+# 🗄️ የውስጥ ዳታቤዞች
 active_games = {"30": {}, "50": {}, "100": {}} 
 pending_payments = {} 
 
 user_wallets = {}     
 user_play_counts = {} 
 referred_users = {}   # {"የተጋበዘው_id": "የጋባዡ_id"}
-rewarded_referrals = set() # 🛑 አንድ ሰው ከአንድ ሰው በላይ ድጋሚ ኮሚሽን እንዳይበላ መከላከያ
+rewarded_referrals = set() 
 
 def check_and_create_user(user_id: int):
     if user_id not in user_wallets:
         user_wallets[user_id] = 0.0
     if user_id not in user_play_counts:
         user_play_counts[user_id] = 0
-
-# --- 📱 የቁልፍ ሰሌዳዎች (Keyboards) ---
-
-def generate_rooms_keyboard():
-    buttons = []
-    for room_id, info in ROOMS.items():
-        current_count = len(active_games[room_id])
-        text = f"{info['name']} - [{current_count}/{info['max_players']}]"
-        buttons.append([InlineKeyboardButton(text=text, callback_data=f"select_room_{room_id}")])
-    
-    buttons.append([
-        InlineKeyboardButton(text="💳 የእኔ ዋሌት", callback_data="view_wallet"),
-        InlineKeyboardButton(text="👥 ሰዎችን ጋብዝ", callback_data="view_ref")
-    ])
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-def generate_numbers_keyboard(room_id: str):
-    game = active_games[room_id]
-    max_players = ROOMS[room_id]["max_players"]
-    buttons = []
-    row = []
-    
-    for i in range(1, max_players + 1):
-        num_str = str(i)
-        if num_str in game:
-            text = f"🔴 {i}"
-            callback_data = f"already_sold_{room_id}_{i}"
-        else:
-            text = f"🟢 ቁጥር {i}"
-            callback_data = f"buy_{room_id}_{i}"
-            
-        row.append(InlineKeyboardButton(text=text, callback_data=callback_data))
-        if i % 2 == 0 or i == max_players: 
-            buttons.append(row)
-            row = []
-            
-    buttons.append([InlineKeyboardButton(text="🔙 ወደ ክፍሎች ተመለስ", callback_data="back_to_rooms")])
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-def get_player_list_text(room_id: str):
-    game = active_games[room_id]
-    info = ROOMS[room_id]
-    list_text = f"<b>📊 የ{info['name']} ተሳታፊዎች ዝርዝር፦</b>\n"
-    list_text += "━━━━━━━━━━━━━━━━━━━\n"
-    for i in range(1, info["max_players"] + 1):
-        num_str = str(i)
-        if num_str in game:
-            list_text += f" {i} 🔴 <b>{game[num_str]['name']}</b>\n"
-        else:
-            list_text += f" {i} 🔓 <i>ነጻ ቁጥር (ክፍት)</i>\n"
-    list_text += "━━━━━━━━━━━━━━━━━━━"
-    return list_text
 
 # --- 🚀 የቦቱ ትዕዛዞች (Handlers) ---
 
@@ -119,76 +71,73 @@ async def start_handler(message: types.Message):
 
     welcome_text = (
         "💎 <b>እንኳን ወደ ዕድል እሽከርክሪት ማዕከል በሰላም መጡ!</b> 💎\n\n"
-        "👇 እባክዎ መጫወት የሚፈልጉትን የጨዋታ ክፍል ይምረጡ፦"
-    )
-    await message.answer(text=welcome_text, reply_markup=generate_rooms_keyboard(), parse_mode="HTML")
-
-@dp.callback_query(F.data == "back_to_rooms")
-async def back_to_rooms_handler(callback_query: types.CallbackQuery):
-    await callback_query.answer()
-    await callback_query.message.edit_text("👇 እባክዎ መጫወት የሚፈልጉትን የጨዋታ ክፍል ይምረጡ፦", reply_markup=generate_rooms_keyboard(), parse_mode="HTML")
-
-@dp.callback_query(F.data.startswith("select_room_"))
-async def select_room_handler(callback_query: types.CallbackQuery):
-    room_id = callback_query.data.split("_")[2]
-    info = ROOMS[room_id]
-    current_count = len(active_games[room_id])
-    
-    welcome_text = (
-        f"<b>⚙️ {info['name']}</b>\n\n"
-        f"💰 <b>የትኬት ዋጋ፦</b> <code>{info['price']} ብር</code>\n"
-        f"🏆 <b>የአሸናፊው ሽልማት፦</b> <b>{info['prize']} ብር በቀጥታ!</b>\n"
-        f"👥 <b>የተሸጡ ትኬቶች፦</b> 📊 <b>{current_count}/{info['max_players']}</b>\n\n"
-        f"{get_player_list_text(room_id)}\n\n"
-        "👇 ክፍት የሆነ የዕድል ቁጥር ይምረጡ፦"
-    )
-    await callback_query.answer()
-    await callback_query.message.edit_text(text=welcome_text, reply_markup=generate_numbers_keyboard(room_id), parse_mode="HTML")
-
-# --- 🎰 የቁጥር መግዣ እና የክፍያ ሂደት ---
-
-@dp.callback_query(F.data.startswith("buy_"))
-async def buy_number_handler(callback_query: types.CallbackQuery):
-    parts = callback_query.data.split("_")
-    room_id = parts[1]
-    selected_num = parts[2]
-    user_id = callback_query.from_user.id
-    username = callback_query.from_user.full_name
-    info = ROOMS[room_id]
-    
-    if selected_num in active_games[room_id]:
-        await callback_query.answer("❌ ይቅርታ፣ ይህ ቁጥር አሁን በሌላ ሰው ተገዝቷል!", show_alert=True)
-        await callback_query.message.edit_reply_markup(reply_markup=generate_numbers_keyboard(room_id))
-        return
-
-    if user_id in pending_payments:
-        await callback_query.answer("⚠️ ቀደም ሲል የላኩት ክፍያ ማረጋገጫ በሂደት ላይ ነው!", show_alert=True)
-        return
-
-    await callback_query.answer()
-    
-    payment_instruction = (
-        f"✨ <b>የክፍያ ማረጋገጫ ፎርም</b> ✨\n\n"
-        f"🎪 <b>ክፍል፦</b> {info['name']}\n"
-        f"🎯 <b>የመረጡት ቁጥር፦</b> <b>ቁጥር {selected_num}</b>\n"
-        f"💰 <b>የሚከፍሉት መጠን፦</b> <code>{info['price']} ብር</code>\n\n"
-        f"📱 <b>የቴሌብር ቁጥር፦</b> <code>{TELEBIRR_NUMBER}</code>\n"
-        f"👤 <b>ስም፦</b> {TELEBIRR_NAME}\n\n"
-        f"📸 እባክዎ ክፍያውን ፈጽመው ሲጨርሱ <b>የክፍያውን ስክሪንሾት (Screenshot) ፎቶ</b> ብቻ እዚህ ላይ ይላኩ።"
+        "ልክ እንደ Hamster Kombat ከታች ያለውን <b>'🕹️ ጨዋታውን ክፈት'</b> በተን በመጫን "
+        "ክፍሎችን ማየትና የሚወዱትን የዕድል ቁጥር መምረጥ ይችላሉ!"
     )
     
-    pending_payments[user_id] = {"num": selected_num, "room": room_id, "name": username}
-    await callback_query.message.answer(payment_instruction, parse_mode="HTML")
+    # 📱 የዌብ አፕ እና የሪፈራል በተኖች መዋቅር
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🕹️ ጨዋታውን ክፈት (Open App)", web_app={"url": WEB_APP_URL})],
+        [
+            InlineKeyboardButton(text="💳 የእኔ ዋሌት", callback_data="view_wallet"),
+            InlineKeyboardButton(text="👥 ሰዎችን ጋብዝ", callback_data="view_ref")
+        ]
+    ])
+    
+    await message.answer(text=welcome_text, reply_markup=keyboard, parse_mode="HTML")
 
-@dp.callback_query(F.data.startswith("already_sold_"))
-async def already_sold_handler(callback_query: types.CallbackQuery):
-    await callback_query.answer("❌ ይህ ቁጥር ተሽጧል! እባክዎ ሌላ ክፍት ቁጥር ይምረጡ።", show_alert=True)
+# --- 🎰 ከዌብ አፕ (Mini App) የሚመጣን ዳታ መቀበያ ---
+
+@dp.message(F.web_app_data)
+async def web_app_data_handler(message: types.Message):
+    user_id = message.from_user.id
+    username = message.from_user.full_name
+    
+    try:
+        # ከ index.html የተላከውን የ JSON ዳታ መፍታት
+        web_data = json.loads(message.web_app_data.data)
+        room_id = str(web_data.get("room"))
+        selected_num = str(web_data.get("number"))
+        
+        info = ROOMS.get(room_id)
+        if not info:
+            await message.answer("❌ የጨዋታው ክፍል አልተገኘም።")
+            return
+
+        # ቁጥሩ አስቀድሞ መያዙን ማረጋገጥ
+        if selected_num in active_games[room_id]:
+            await message.answer("❌ ይቅርታ፣ ይህ ቁጥር አሁን በሌላ ሰው ተገዝቷል! እባክዎ ድጋሚ አፑን ከፍተው ሌላ ቁጥር ይምረጡ።")
+            return
+
+        if user_id in pending_payments:
+            await message.answer("⚠️ ቀደም ሲል የላኩት ክፍያ ማረጋገጫ በሂደት ላይ ነው! እሱ እስኪጸድቅ እባክዎ ይጠብቁ።")
+            return
+
+        # የክፍያ መመሪያ መላክ
+        payment_instruction = (
+            f"✨ <b>የክፍያ ማረጋገጫ ፎርም</b> ✨\n\n"
+            f"🎪 <b>ክፍል፦</b> {info['name']}\n"
+            f"🎯 <b>የመረጡት ቁጥር፦</b> <b>ቁጥር {selected_num}</b>\n"
+            f"💰 <b>የሚከፍሉት መጠን፦</b> <code>{info['price']} ብር</code>\n\n"
+            f"📱 <b>የቴሌብር ቁጥር፦</b> <code>{TELEBIRR_NUMBER}</code>\n"
+            f"👤 <b>ስም፦</b> {TELEBIRR_NAME}\n\n"
+            f"📸 እባክዎ ክፍያውን ፈጽመው ሲጨርሱ <b>የክፍያውን ስክሪንሾት (Screenshot) ፎቶ</b> ብቻ እዚህ ላይ ይላኩ።"
+        )
+        
+        pending_payments[user_id] = {"num": selected_num, "room": room_id, "name": username}
+        await message.answer(payment_instruction, parse_mode="HTML")
+        
+    except Exception as e:
+        await message.answer("❌ መረጃውን በማስተናገድ ላይ ስህተት አጋጥሟል።")
+        print(f"Web App Data Error: {e}")
+
+# --- 📸 የስክሪንሾት አቀባበል ---
 
 @dp.message(F.photo)
 async def screenshot_receiver(message: types.Message):
     user_id = message.from_user.id
     if user_id not in pending_payments:
-        await message.reply("⚠️ እባክዎ መጀመሪያ ቁጥር ይምረጡ፤ ከዚያ ፎቶ ይላኩ።")
+        await message.reply("⚠️ እባክዎ መጀመሪያ ከጨዋታው መተግበሪያ ውስጥ ቁጥር ይምረጡ፤ ከዚያ ፎቶ ይላኩ።")
         return
         
     user_data = pending_payments[user_id]
@@ -251,7 +200,7 @@ async def admin_approve_handler(callback_query: types.CallbackQuery):
         except Exception:
             pass
     
-    # 🎖️ የታማኝነት ጉርሻ (Loyalty)
+    # 🎖️ የታማኝነት ጉርሻ
     loyalty_text = ""
     if user_play_counts[target_user_id] % 5 == 0:
         user_wallets[target_user_id] += 10.0
@@ -306,7 +255,7 @@ async def start_spinning_effect(chat_id: int, room_id: str):
     
     msg = await bot.send_message(chat_id=chat_id, text=f"🚨 <b>የ{info['name']} ሁሉም ትኬቶች ተሽጠዋል! የዕድል መንኮራኩሩ አሁን ይጀምራል...</b>", parse_mode="HTML")
     await asyncio.sleep(3)
-    await msg.edit_text("🔄 <b>የዕድል መንኮራኩሩ በከፍተኛ ፍጥነት እየተሽከረከረ ነው... [ 🎰 SPINNING ]</b>", parse_mode="HTML")
+    await msg.edit_text("🔄 <b>የዕድል መንኮራኩሩ በከጨማሪ ፍጥነት እየተሽከረከረ ነው... [ 🎰 SPINNING ]</b>", parse_mode="HTML")
     await asyncio.sleep(3)
     
     players = active_games[room_id]
@@ -363,47 +312,33 @@ async def send_promotions():
     bot_info = await bot.get_me()
     bot_link = f"https://t.me/{bot_info.username}?start=ad"
     
-    # 📝 3 የተለያዩ የማስታወቂያ ይዘቶች
     ads = [
         f"👥 <b>ጓደኞችዎን እየጋበዙ ነው?</b>\n\nየእርስዎን ልዩ የመጋበዣ ሊንክ ከቦቱ ውስጥ በመውሰድ ለጓደኞችዎ ያጋሩ! እነሱ መጥተው የመጀመሪያ ጨዋታቸውን ሲጫወቱ የእርስዎ የ <b>3 ብር</b> ኮሚሽን በራስ-ሰር ዋሌትዎ ላይ ይገባል! 🎁\n\n🔗 ቦቱን ለማግኘት ከታች ያለውን በተን ይጫኑ።",
-        
         f"🎖️ <b>ማሳሰቢያ ለተጫዋቾቻችን!</b>\n\nበእኛ ቦት ላይ በቋሚነት ለሚጫወቱ ታማኝ ደንበኞች ልዩ ስጦታ አዘጋጅተናል። <b>5 ጊዜ</b> በተጫወቱ ቁጥር የ <b>10 ብር የዋሌት ስጦታ</b> ያገኛሉ! 🎰\n\nይጫወቱ፣ ያሸንፉ፣ ተጨማሪ ጉርሻዎችን ይሰብስቡ! 🚀",
-        
         f"🎡 <b>ዕድልዎን ለመሞከር እና ፈጣን የቴሌብር ሽልማቶችን ለማሸነፍ ዝግጁ ነዎት?</b>\n\n🥉 የነሐስ፣ 🥈 የብር እና 🥇 የወርቅ ክፍሎችን በመቀላቀል የአሸናፊነት እጣዎን ይያዙ! ጨዋታው ሙሉ በሙሉ ግልጽ እና ታማኝ በሆነ ሲስተም የሚመራ ነው። \n\n🕹️ <b>አሁኑኑ መጫወት ለመጀመር ከታች ያለውን ቁልፍ ይጫኑ፦</b>"
     ]
     
-    # ሰዎችን በቀጥታ ወደ ቦቱ የሚወስድ በተን
     inline_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🕹️ ቦቱን በውስጥ መስመር አናግር", url=bot_link)]
+        [InlineKeyboardButton(text="🕹️ ጨዋታውን ክፈት (Open App)", web_app={"url": WEB_APP_URL})]
     ])
     
-    await asyncio.sleep(60) # ቦቱ እንደተነሳ ግሩፑ እንዳይጨናነቅ 1 ደቂቃ ይጠብቅ
-    
+    await asyncio.sleep(60) 
     while True:
         for ad_text in ads:
             try:
-                await bot.send_message(
-                    chat_id=GROUP_CHAT_ID,
-                    text=ad_text,
-                    reply_markup=inline_kb,
-                    parse_mode="HTML"
-                )
+                await bot.send_message(chat_id=GROUP_CHAT_ID, text=ad_text, reply_markup=inline_kb, parse_mode="HTML")
             except Exception as e:
-                print(f"የማስታወቂያ ስህተት፦ {e}")
-            
-            await asyncio.sleep(1800) # ⏳ በትክክል ለ 30 ደቂቃ (1800 ሰከንድ) ይጠብቃል!
+                print(f"Promo error: {e}")
+            await asyncio.sleep(1800) 
 
 @dp.message()
 async def block_other_messages(message: types.Message):
     if message.chat.type == "private":
-        await message.reply("⚠️ እባክዎ የክፍያ ስክሪንሾት (የፎቶ ፋይል) ብቻ ይላኩ።")
+        await message.reply("⚠️ እባክዎ መጀመሪያ ከጨዋታው መተግበሪያ ውስጥ ቁጥር ይምረጡ፤ ቦቱ ላይ የክፍያ ስክሪንሾት (የፎቶ ፋይል) ብቻ ነው የሚቀበለው።")
 
 async def main():
     await bot.set_my_commands([BotCommand(command="start", description="🕹️ ጨዋታውን ይጀምሩ")])
-    
-    # ⚙️ የማስታወቂያ ፕሮግራሙን በጀርባ (Task) እንዲነሳ የማድረጊያ መዋቅር
     asyncio.create_task(send_promotions())
-    
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
