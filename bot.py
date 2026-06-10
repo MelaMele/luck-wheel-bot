@@ -15,8 +15,8 @@ TELEBIRR_NUMBER = "0920628769"
 TELEBIRR_NAME = "Tsige Tulu"
 GROUP_LINK = "https://t.me/Yechewatamenkurakur" 
 
-# 🌐 የዌብ አፕሊኬሽንህ ሊንክ (በትክክል መተካቱን አረጋግጥ)
-WEB_APP_URL = "https://melamele.github.io/mela-wheel-app/"
+# 🌐 የዌብ አፕሊኬሽንህ ትክክለኛ ሊንክ (404 እንዳይመጣ የመጨረሻዋ ሰረዝ (/) ግዴታ ናት!)
+WEB_APP_URL = "https://melamele.github.io/mela-wheel-app/" 
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -71,11 +71,11 @@ async def start_handler(message: types.Message):
 
     welcome_text = (
         "💎 <b>እንኳን ወደ ዕድል እሽከርክሪት ማዕከል በሰላም መጡ!</b> 💎\n\n"
-        "ልክ እንደ Hamster Kombat ከታች ያለውን <b>'🕹️ ጨዋታውን ክፈት'</b> በተን በመጫን "
-        "ክፍሎችን ማየትና የሚወዱትን የዕድል ቁጥር መምረጥ ይችላሉ!"
+        "ከታች ያለውን <b>'🕹️ ጨዋታውን ክፈት'</b> በተን በመጫን "
+        "የሚሽከረከረውን አኒሜሽን ማየትና የዕድል ቁጥርዎን መምረጥ ይችላሉ!"
     )
     
-    # 📱 የዌብ አፕ እና የሪፈራል በተኖች መዋቅር
+    # 📱 የዌብ አፕ (Mini App) ቁልፍ መዋቅር
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🕹️ ጨዋታውን ክፈት (Open App)", web_app={"url": WEB_APP_URL})],
         [
@@ -86,7 +86,7 @@ async def start_handler(message: types.Message):
     
     await message.answer(text=welcome_text, reply_markup=keyboard, parse_mode="HTML")
 
-# --- 🎰 ከዌብ አፕ (Mini App) የሚመጣን ዳታ መቀበያ ---
+# --- 🎰 ከሚኒ አፕ (Mini App) የሚመጣን ዳታ መቀበያ ---
 
 @dp.message(F.web_app_data)
 async def web_app_data_handler(message: types.Message):
@@ -306,31 +306,6 @@ async def view_ref_handler(callback_query: types.CallbackQuery):
     await callback_query.answer()
     await callback_query.message.answer(ref_text, parse_mode="HTML")
 
-# --- 📢 በየ 30 ደቂቃው የሚላኩ አውቶሜትድ አነሳሽ ማስታወቂያዎች ---
-
-async def send_promotions():
-    bot_info = await bot.get_me()
-    bot_link = f"https://t.me/{bot_info.username}?start=ad"
-    
-    ads = [
-        f"👥 <b>ጓደኞችዎን እየጋበዙ ነው?</b>\n\nየእርስዎን ልዩ የመጋበዣ ሊንክ ከቦቱ ውስጥ በመውሰድ ለጓደኞችዎ ያጋሩ! እነሱ መጥተው የመጀመሪያ ጨዋታቸውን ሲጫወቱ የእርስዎ የ <b>3 ብር</b> ኮሚሽን በራስ-ሰር ዋሌትዎ ላይ ይገባል! 🎁\n\n🔗 ቦቱን ለማግኘት ከታች ያለውን በተን ይጫኑ።",
-        f"🎖️ <b>ማሳሰቢያ ለተጫዋቾቻችን!</b>\n\nበእኛ ቦት ላይ በቋሚነት ለሚጫወቱ ታማኝ ደንበኞች ልዩ ስጦታ አዘጋጅተናል። <b>5 ጊዜ</b> በተጫወቱ ቁጥር የ <b>10 ብር የዋሌት ስጦታ</b> ያገኛሉ! 🎰\n\nይጫወቱ፣ ያሸንፉ፣ ተጨማሪ ጉርሻዎችን ይሰብስቡ! 🚀",
-        f"🎡 <b>ዕድልዎን ለመሞከር እና ፈጣን የቴሌብር ሽልማቶችን ለማሸነፍ ዝግጁ ነዎት?</b>\n\n🥉 የነሐስ፣ 🥈 የብር እና 🥇 የወርቅ ክፍሎችን በመቀላቀል የአሸናፊነት እጣዎን ይያዙ! ጨዋታው ሙሉ በሙሉ ግልጽ እና ታማኝ በሆነ ሲስተም የሚመራ ነው። \n\n🕹️ <b>አሁኑኑ መጫወት ለመጀመር ከታች ያለውን ቁልፍ ይጫኑ፦</b>"
-    ]
-    
-    inline_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🕹️ ጨዋታውን ክፈት (Open App)", web_app={"url": WEB_APP_URL})]
-    ])
-    
-    await asyncio.sleep(60) 
-    while True:
-        for ad_text in ads:
-            try:
-                await bot.send_message(chat_id=GROUP_CHAT_ID, text=ad_text, reply_markup=inline_kb, parse_mode="HTML")
-            except Exception as e:
-                print(f"Promo error: {e}")
-            await asyncio.sleep(1800) 
-
 @dp.message()
 async def block_other_messages(message: types.Message):
     if message.chat.type == "private":
@@ -338,7 +313,6 @@ async def block_other_messages(message: types.Message):
 
 async def main():
     await bot.set_my_commands([BotCommand(command="start", description="🕹️ ጨዋታውን ይጀምሩ")])
-    asyncio.create_task(send_promotions())
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
