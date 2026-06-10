@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ዕድል እሽከርክሪት Mini App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #121212;
+            color: white;
+            text-align: center;
+            margin: 0;
+            padding: 15px;
+            overflow-x: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #d4af37, #aa7c11);
+            padding: 12px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        h2 { margin: 0; font-size: 22px; color: #fff; }
+        
+        /* 🎡 የሚሽከረከረው መንኮራኩር ዲዛይን */
+        .wheel-container {
+            position: relative;
+            width: 260px;
+            height: 260px;
+            margin: 20px auto;
+        }
+        .wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 8px solid #d4af37;
+            position: relative;
+            overflow: hidden;
+            transition: transform 4s cubic-bezier(0.1, 0.8, 0.1, 1);
+            background: conic-gradient(
+                #e74c3c 0deg 36deg, #3498db 36deg 72deg,
+                #2ecc71 72deg 108deg, #f1c40f 108deg 144deg,
+                #9b59b6 144deg 180deg, #1abc9c 180deg 216deg,
+                #e67e22 216deg 252deg, #34495e 252deg 288deg,
+                #27ae60 288deg 324deg, #8e44ad 324deg 360deg
+            );
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.6);
+        }
+        /* የመንኮራኩር ጠቋሚ (Arrow) */
+        .pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 25px solid #d4af37;
+            z-index: 10;
+        }
+        .center-dot {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30px;
+            height: 30px;
+            background: white;
+            border: 4px solid #d4af37;
+            border-radius: 50%;
+            z-index: 5;
+        }
+
+        /* 📊 የቁጥሮች ሰሌዳ */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            max-width: 340px;
+            margin: 15px auto;
+        }
+        .number-btn {
+            aspect-ratio: 1;
+            background: #1e272e;
+            border: 2px solid #2f3542;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .number-btn:active { background: #d4af37; transform: scale(0.9); }
+        .number-btn.selected { border-color: #d4af37; background: #aa7c11; }
+
+        /* 💰 የክፍል መምረጫ */
+        .room-selector {
+            display: flex;
+            justify-content: space-between;
+            max-width: 340px;
+            margin: 0 auto 15px auto;
+        }
+        .room-btn {
+            flex: 1;
+            margin: 0 4px;
+            padding: 8px;
+            background: #2f3542;
+            border: 1px solid #57606f;
+            color: #ced6e0;
+            border-radius: 8px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .room-btn.active {
+            background: #d4af37;
+            color: black;
+            font-weight: bold;
+            border-color: white;
+        }
+
+        /* 🧾 የክፍያ ፓናል */
+        #order-panel {
+            display: none;
+            background: #1e272e;
+            padding: 15px;
+            border-radius: 15px;
+            max-width: 340px;
+            margin: 15px auto;
+            border: 1px solid #d4af37;
+        }
+        .buy-btn {
+            background: #2ed573;
+            color: black;
+            border: none;
+            padding: 12px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2>🎡 የዕድል እሽከርክሪት ማዕከል</h2>
+    </div>
+
+    <div class="room-selector">
+        <button class="room-btn active" onclick="selectRoom('30')">🥉 የነሐስ (30 ብር)</button>
+        <button class="room-btn" onclick="selectRoom('50')">🥈 የብር (50 ብር)</button>
+        <button class="room-btn" onclick="selectRoom('100')">🥇 የወርቅ (100 ብር)</button>
+    </div>
+
+    <div class="wheel-container">
+        <div class="pointer"></div>
+        <div class="center-dot"></div>
+        <div class="wheel" id="wheel"></div>
+    </div>
+
+    <h3 id="status-text" style="color: #d4af37; font-size: 16px;">👇 ቁጥርዎን ይምረጡ</h3>
+
+    <div class="grid" id="number-grid"></div>
+
+    <div id="order-panel">
+        <p id="order-summary" style="margin: 0 0 10px 0; font-size: 14px;"></p>
+        <button class="buy-btn" onclick="confirmOrder()">✅ የመረጥኩትን ቁጥር አስመዝግብ</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand(); 
+
+        let selectedNumber = null;
+        let currentRoomPrice = 30;
+
+        function selectRoom(price) {
+            currentRoomPrice = price;
+            document.querySelectorAll('.room-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            renderNumbers();
+            document.getElementById('order-panel').style.display = 'none';
+            document.getElementById('status-text').innerText = "👇 ቁጥርዎን ይምረጡ";
+        }
+
+        function renderNumbers() {
+            const grid = document.getElementById('number-grid');
+            grid.innerHTML = '';
+            // ክፍሎቹ 5 ወይም 10 ሰው የሚይዙ መሆናቸውን መወሰኛ
+            const maxNumbers = currentRoomPrice === '30' ? 10 : 5;
+            
+            for (let i = 1; i <= maxNumbers; i++) {
+                const btn = document.createElement('div');
+                btn.className = 'number-btn';
+                btn.innerText = i;
+                btn.id = 'num-' + i;
+                btn.onclick = () => selectNumber(i);
+                grid.appendChild(btn);
+            }
+        }
+
+        function selectNumber(num) {
+            selectedNumber = num;
+            document.querySelectorAll('.number-btn').forEach(b => b.classList.remove('selected'));
+            document.getElementById('num-' + num).classList.add('selected');
+            
+            document.getElementById('order-panel').style.display = 'block';
+            document.getElementById('order-summary').innerText = `🎯 ክፍል፦ ${currentRoomPrice} ብር | የመረጡት ቁጥር፦ ቁጥር ${num}`;
+            
+            // 🎡 ትንሽ ፈታኝ እሽከርክሪት (ለቅምሻ ያህል)
+            const wheel = document.getElementById('wheel');
+            const randomDegrees = Math.floor(Math.random() * 360);
+            wheel.style.transform = `rotate(${randomDegrees}deg)`;
+        }
+
+        function confirmOrder() {
+            const data = {
+                room: currentRoomPrice,
+                number: selectedNumber
+            };
+            tg.sendData(JSON.stringify(data)); // መረጃውን ወደ ቦቱ መላኪያ
+            tg.close(); 
+        }
+
+        renderNumbers();
+    </script>
+</body>
+</html>
