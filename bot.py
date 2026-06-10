@@ -13,8 +13,7 @@ TELEBIRR_NUMBER = "0920628769"
 TELEBIRR_NAME = "Tsige Tulu"
 GROUP_LINK = "https://t.me/Yechewatamenkurakur"
 
-# 🌐 ያንተ ዌብሳይት ሊንክ (የመጨረሻዋ ሰረዝ ግዴታ ናት!)
-WEB_APP_URL = "https://melamele.github.io/luck-wheel-bot/"
+WEB_APP_URL = "https://melamele.github.io/mela-wheel-app/"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -25,12 +24,39 @@ ROOMS = {
     "100": {"name": "🥇 የወርቅ ክፍል (100 ብር)", "price": 100, "max_players": 5, "prize": 400}
 }
 
-active_games = {"30": {}, "50": {}, "100": {}}
+DATA_FILE = "game_data.json"
+
+def load_data():
+    global active_games
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r") as f:
+            active_games = json.load(f)
+    else:
+        active_games = {"30": {}, "50": {}, "100": {}}
+
+def save_data():
+    with open(DATA_FILE, "w") as f:
+        json.dump(active_games, f)
+
+load_data()
 pending_payments = {}
 user_wallets = {}
 user_play_counts = {}
 referred_users = {}
 rewarded_referrals = set()
+
+# 📝 በየ 30 ደቂቃው የሚለቀቁ የሚያነሳሱ የማስታወቂያ ፅሁፎች
+PROMOTION_MESSAGES = [
+    "🔥 <b>ዕድልዎን ለመሞከር ዝግጁ ነዎት?</b>\n\n🎯 ትናንሽ ሳንቲሞችን ወደ ትልቅ ሽልማት የሚቀይሩበት ሰዓት አሁን ነው! በ 30 ብር ብቻ ተሳትፈው የ <b>250 ብር</b> ባለቤት ይሁኑ።\n\n🚀 <i>ቦቱን በውስጥ መስመር አናግረው 'ጨዋታውን ክፈት' የሚለውን ይጫኑ!</i>",
+    
+    "💰 <b>የዛሬው እድለኛ እርስዎ ሊሆኑ ይችላሉ!</b>\n\n🥇 የወርቅ ክፍላችን (100 ብር) ላይ በመሳተፍ የ <b>400 ብር</b> አሸናፊ ይሁኑ። ቦታዎች ሳይሞሉ አሁኑኑ ትኬትዎን ይቁረጡ! 🎉\n\n🤖 <i>ለመጫወት ከታች ያለውን ሊንክ ተጭነው ቦቱን ያስጀምሩት!</i>",
+    
+    "👥 <b>ሰዎችን ይጋብዙ፣ በነጻ ይጫወቱ!</b>\n\n🎁 የእርስዎን መጋበዣ ሊንክ (Referral Link) ለወዳጅ ዘመድዎ በመላክ፣ እነሱ መጀመሪያ ሲጫወቱ <b>3 ብር</b> ዋሌትዎ ላይ በነጻ ያግኙ! ብዙ በጋበዙ ቁጥር ያለምንም ክፍያ የመጫወት ዕድል ያገኛሉ። 💸",
+    
+    "🎡 <b>የዕድል መንኮራኩር ማዕከል!</b>\n\n⚡️ ፍጹም ታማኝ፣ ፈጣን እና አውቶሜትድ የሆነ የኢትዮጵያ ቀዳሚ የቴሌግራም ጌም! ክፍያዎ በአስተዳዳሪው እንደጸደቀ ቁጥርዎ ወዲያውኑ ይመዘገባል።\n\n🎪 <i>በ 30፣ 50 ወይም 100 ብር ክፍሎች ውስጥ ይሳተፉ!</i>",
+    
+    "💎 <b>የታማኝነት ልዩ ስጦታ!</b>\n\n🎮 በቦታችን ላይ 5 ጊዜ ለተጫወቱ ደንበኞቻችን በሙሉ <b>10 ብር የዋሌት ጉርሻ (Bonus)</b> በነጻ እንሰጣለን! እየተዝናኑ ያትርፉ። 🎰"
+]
 
 def check_and_create_user(user_id: int):
     if user_id not in user_wallets: user_wallets[user_id] = 0.0
@@ -49,9 +75,17 @@ async def start_handler(message: types.Message):
         if ref_id != user_id and user_id not in referred_users:
             referred_users[user_id] = ref_id
 
-    # 🕹️ አፑን ለመክፈት አስተማማኙ መንገድ ReplyKeyboardMarkup መጠቀም ነው
+    sold_data = {
+        "r30": list(active_games["30"].keys()),
+        "r50": list(active_games["50"].keys()),
+        "r100": list(active_games["100"].keys())
+    }
+    import urllib.parse
+    encoded_sold = urllib.parse.quote(json.dumps(sold_data))
+    final_url = f"{WEB_APP_URL}?sold={encoded_sold}"
+
     kb = ReplyKeyboardMarkup(keyboard=[
-        [KeyboardButton(text="🕹️ ጨዋታውን ክፈት", web_app=WebAppInfo(url=WEB_APP_URL))],
+        [KeyboardButton(text="🕹️ ጨዋታውን ክፈት", web_app=WebAppInfo(url=final_url))],
         [KeyboardButton(text="💳 ዋሌት"), KeyboardButton(text="👥 ጋብዝ")]
     ], resize_keyboard=True)
 
@@ -66,7 +100,7 @@ async def web_app_data_handler(message: types.Message):
         info = ROOMS[room_id]
 
         if num in active_games[room_id]:
-            await message.answer("❌ ይቅርታ፣ ይህ ቁጥር በሌላ ሰው ተይዟል። እባክዎ ድጋሚ አፑን ከፍተው ሌላ ቁጥር ይምረጡ።")
+            await message.answer("❌ <b>ይቅርታ፣ ይህ ቁጥር አሁን በሌላ ሰው ተይዟል!</b>\nእባክዎ ድጋሚ 'ጨዋታውን ክፈት' የሚለውን ተጭነው ሌላ ቁጥር ይምረጡ።")
             return
 
         if user_id in pending_payments:
@@ -75,7 +109,7 @@ async def web_app_data_handler(message: types.Message):
 
         pending_payments[user_id] = {"num": num, "room": room_id, "name": message.from_user.full_name}
         
-        pay_msg = (f"✨ <b>የክክፍያ ማረጋገጫ ፎርም</b> ✨\n\n🎪 <b>ክፍል፦</b> {info['name']}\n🎯 <b>የመረጡት ቁጥር፦</b> <b>ቁጥር {num}</b>\n"
+        pay_msg = (f"✨ <b>የክፍያ ማረጋገጫ ፎርም</b> ✨\n\n🎪 <b>ክፍል፦</b> {info['name']}\n🎯 <b>የመረጡት ቁጥር፦</b> <b>ቁጥር {num}</b>\n"
                    f"💰 <b>የሚከፍሉት መጠን፦</b> <code>{info['price']} ብር</code>\n\n📱 <b>የቴሌብር ቁጥር፦</b> <code>{TELEBIRR_NUMBER}</code>\n"
                    f"👤 <b>ስም፦</b> {TELEBIRR_NAME}\n\n📸 እባክዎ ክፍያውን ፈጽመው ሲጨርሱ <b>የክፍያውን ስክሪንሾት (Screenshot) ፎቶ</b> ብቻ እዚህ ላይ ይላኩ።")
         await message.answer(pay_msg, parse_mode="HTML")
@@ -104,11 +138,16 @@ async def admin_approve_handler(cb: types.CallbackQuery):
     rid, num = d['room'], d['num']
     info = ROOMS[rid]
     
+    if num in active_games[rid]:
+        await bot.send_message(uid, "❌ <b>ይቅርታ፣ ይህ ቁጥር እርስዎ ክፍያ እስኪፈጽሙ ድረስ በሌላ ሰው ተይዟል።</b>")
+        del pending_payments[uid]
+        return
+
     active_games[rid][num] = {"user_id": uid, "name": d['name']}
+    save_data()
     check_and_create_user(uid)
     user_play_counts[uid] += 1
     
-    # 👥 የሪፈራል ኮሚሽን (3 ብር)
     if uid in referred_users and uid not in rewarded_referrals:
         ref_id = referred_users[uid]
         check_and_create_user(ref_id)
@@ -117,7 +156,6 @@ async def admin_approve_handler(cb: types.CallbackQuery):
         try: await bot.send_message(ref_id, f"🎁 <b>የአፍሊየት ኮሚሽን ገቢ!</b> የጋበዙት ሰው የመጀመሪያ ጨዋታውን ስለተጫወተ <b>3 ብር</b> ዋሌትዎ ላይ ተጨምሯል!", parse_mode="HTML")
         except: pass
 
-    # 🎖️ የታማኝነት ጉርሻ
     loyalty_text = ""
     if user_play_counts[uid] % 5 == 0:
         user_wallets[uid] += 10.0
@@ -133,7 +171,8 @@ async def admin_approve_handler(cb: types.CallbackQuery):
     except: pass
     
     del pending_payments[uid]
-    if count >= info["max_players"]: await start_spinning_effect(GROUP_CHAT_ID, rid)
+    if count >= info["max_players"]: 
+        await start_spinning_effect(GROUP_CHAT_ID, rid)
 
 @dp.callback_query(F.data.startswith("adm_rj_"))
 async def admin_reject_handler(cb: types.CallbackQuery):
@@ -160,6 +199,7 @@ async def start_spinning_effect(chat_id, rid):
     else: txt = f"🎰 ያረፈበት ቁጥር <b>ቁጥር {winner_num}</b> ነበር። ግን ማንም ስላልገዛው አሸናፊ የለም።"
     await msg.edit_text(txt, parse_mode="HTML")
     active_games[rid] = {}
+    save_data()
 
 @dp.message(F.text == "💳 ዋሌት")
 async def wallet(msg: types.Message):
@@ -174,7 +214,33 @@ async def invite(msg: types.Message):
     total = list(referred_users.values()).count(uid)
     await msg.answer(f"🤝 <b>የመጋበዣ ማዕከል</b>\n\n👥 <b>የጋበዟቸው ሰዎች፦</b> <code>{total} ሰው</code>\n🎁 <b>ስጦታ፦</b> የመጡት ሰው መጀመሪያ ሲጫወት <b>3 ብር</b> ያገኛሉ!\n\n🔗 <b>ሊንክዎ፦</b>\n<code>https://t.me/{b_info.username}?start=ref_{uid}</code>", parse_mode="HTML")
 
+# ⏱️ በየ 30 ደቂቃው በራሱ ጊዜ የሚሰራ የአውቶሜሽን ማስታወቂያ ክፍል (Background Task)
+async def auto_promotion_loop():
+    await asyncio.sleep(10) # ቦቱ እንደተነሳ ለ10 ሰከንድ መጀመሪያ ይጠብቃል
+    b_info = await bot.get_me()
+    while True:
+        try:
+            # ከማስታወቂያዎች ዝርዝር ውስጥ አንዱን በዘፈቀደ (Random) መምረጥ
+            message_text = random.choice(PROMOTION_MESSAGES)
+            
+            # ከታች የሚቀመጥ ቀጥታ ወደ ቦቱ የሚወስድ በተን
+            bot_username = b_info.username
+            inline_kb = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="🎰 አሁኑኑ ይጫወቱ", url=f"https://t.me/{bot_username}")
+            ]])
+            
+            # ወደ ግሩፑ መልዕክቱን መላክ
+            await bot.send_message(chat_id=GROUP_CHAT_ID, text=message_text, reply_markup=inline_kb, parse_mode="HTML")
+            print("🚀 የማስታወቂያ መልዕክት በራስ-ሰር ወደ ግሩፑ ተልኳል!")
+        except Exception as e:
+            print(f"Promotion Loop Error: {e}")
+            
+        # 30 ደቂቃ መጠበቅ (30 ደቂቃ * 60 ሰከንድ = 1800 ሰከንድ)
+        await asyncio.sleep(1800)
+
 async def main():
+    # ቦቱ ከሰዎች ጋር በሚያወራበት (Polling) ሰዓት ማስታወቂያውም በጎን አብሮ እንዲጀምር ማድረግ
+    asyncio.create_task(auto_promotion_loop())
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
