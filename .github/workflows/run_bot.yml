@@ -1,12 +1,17 @@
 name: 🎰 የዕድል መንኮራኩር ቦት አውቶሜሽን
 
+# 🔄 አዲስ ኮድ ሲገፋ (Push ሲደረግ) የድሮውን ቦት በራሱ ጊዜ የሚያጠፋ መከላከያ
+concurrency:
+  group: telegram-bot
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ "main", "master" ]
   schedule:
     # ቦቱ ሳይቋረጥ እንዲሰራ በየ 5 ሰዓቱ በራሱ Workflowውን ይቀሰቅሰዋል
     - cron: '0 */5 * * *'
-  workflow_dispatch: # በራስህ ፍላጎት በማንኛውም ጊዜ በቁልፍ ለማስጀመር
+  workflow_dispatch: # በራስህ ፍላጎት በማንኛውም ጊዜ በባተን ለማስጀመር
 
 jobs:
   run-telegram-bot:
@@ -25,21 +30,11 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        # requirements.txt ከሌለህ aiogram በራሱ እንዲጭን ይህንን መስመር ጨምሬለታለሁ
+        pip install aiogram
 
     - name: 🚀 ቦቱን ማንቀሳቀስ (Run Bot)
       env:
         BOT_TOKEN: ${{ secrets.BOT_TOKEN }} 
       run: |
         python bot.py
-concurrency:
-  group: telemetry-bot
-  cancel-in-progress: true
-  name: Run Telegram Bot
-
-concurrency:
-  group: telegram-bot
-  cancel-in-progress: true  # 👈 አዲስ ኮድ ሲመጣ የድሮውን ቦት ራሱ ያጠፋዋል!
-
-on:
-  push:
-    branches: [ main ]
