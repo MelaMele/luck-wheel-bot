@@ -34,3 +34,12 @@ jobs:
 concurrency:
   group: telemetry-bot
   cancel-in-progress: true
+  name: Run Telegram Bot
+
+concurrency:
+  group: telegram-bot
+  cancel-in-progress: true  # 👈 አዲስ ኮድ ሲመጣ የድሮውን ቦት ራሱ ያጠፋዋል!
+
+on:
+  push:
+    branches: [ main ]
