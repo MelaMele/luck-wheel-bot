@@ -14,7 +14,7 @@ TELEBIRR_NAME = "Tsige Tulu"
 GROUP_LINK = "https://t.me/Yechewatamenkurakur"
 
 # 🌐 ያንተ ዌብሳይት ሊንክ (የመጨረሻዋ ሰረዝ ግዴታ ናት!)
-WEB_APP_URL = "https://melamele.github.io/mela-wheel-app/"
+WEB_APP_URL = "https://melamele.github.io/luck-wheel-bot/"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
