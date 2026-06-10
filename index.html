@@ -14,7 +14,6 @@
             transition: transform 4s cubic-bezier(0.1, 0.8, 0.1, 1);
             position: relative; overflow: hidden;
         }
-        /* 🔢 በክበቡ ላይ የሚቀመጡ ቁጥሮች ስታይል */
         .wheel-number {
             position: absolute; width: 30px; height: 30px; top: 10px; left: 125px;
             transform-origin: 15px 130px; text-align: center; font-weight: bold;
@@ -22,8 +21,14 @@
         }
         .pointer { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 25px solid #d4af37; z-index: 10; }
         .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; max-width: 350px; margin: 20px auto; }
+        
+        /* 🎨 የቁልፎቹ መደበኛ ስታይል */
         .num-btn { background: #1e272e; border: 2px solid #2f3542; color: white; padding: 15px 0; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 16px; }
         .num-btn.active { border-color: #d4af37; background: #aa7c11; }
+        
+        /* 🚨 የተሸጡ ቁጥሮች ስታይል (ቀይ እና የተዘጉ) */
+        .num-btn.sold { background: #c0392b !important; border-color: #7f8c8d !important; color: #eaeded !important; cursor: not-allowed; font-size: 11px; font-weight: normal; }
+
         .room-selector { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
         .room-btn { background: #2f3542; border: 1px solid #d4af37; color: white; padding: 10px; border-radius: 5px; font-size: 13px; font-weight: bold; }
         .room-btn.selected { background: #d4af37; color: black; }
@@ -50,11 +55,21 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
         let selectedRoom = '30'; let selectedNum = null;
+        let soldNumbers = { r30: [], r50: [], r100: [] };
+
+        // 📥 ከቦቱ የተላኩትን የተሸጡ ቁጥሮች ማውጣት
+        const urlParams = new URLSearchParams(window.location.search);
+        const soldParam = urlParams.get('sold');
+        if (soldParam) {
+            try { soldNumbers = JSON.parse(decodeURIComponent(soldParam)); } catch(e) { console.error(e); }
+        }
 
         function setRoom(r) {
             selectedRoom = r;
             document.querySelectorAll('.room-btn').forEach(b => b.classList.remove('selected'));
             document.getElementById('r' + r).classList.add('selected');
+            document.getElementById('confirm-btn').style.display = 'none';
+            selectedNum = null;
             renderGrid();
         }
 
@@ -62,34 +77,42 @@
             const grid = document.getElementById('grid'); grid.innerHTML = '';
             const count = selectedRoom === '30' ? 10 : 5;
             
-            // 🔄 በመንኮራኩሩ ላይ ቁጥሮቹን በክብ ቅርጽ መደርደር
+            // የክፍሉን የተሸጡ ቁጥሮች መለየት
+            const currentSold = soldNumbers['r' + selectedRoom] || [];
+            
             const wheel = document.getElementById('wheel');
             wheel.innerHTML = '';
             const angleStep = 360 / count;
             
             for(let i=1; i<=count; i++) {
-                // 1. ለመንኮራኩሩ ቁጥር መፍጠር
+                // 1. መንኮራኩር ላይ ቁጥር መጻፍ
                 const numDiv = document.createElement('div');
                 numDiv.className = 'wheel-number';
                 numDiv.innerText = i;
-                // ቁጥሩን በተገቢው ዲግሪ ማሽከርከር (ወደ መሃል እንዲያይ)
                 numDiv.style.transform = `rotate(${(i-1) * angleStep + (angleStep/2)}deg)`;
                 wheel.appendChild(numDiv);
 
-                // 2. ከታች የሚጫኑትን ቁልፎች (Grid Buttons) መፍጠር
+                // 2. የበተን ቁልፍ መፍጠር
                 const b = document.createElement('button'); 
-                b.className = 'num-btn'; 
-                b.innerText = i;
-                b.onclick = () => {
-                    selectedNum = i;
-                    document.querySelectorAll('.num-btn').forEach(btn => btn.classList.remove('active'));
-                    b.classList.add('active');
-                    document.getElementById('confirm-btn').style.display = 'block';
-                    
-                    // መንኮራኩሩን በዘፈቀደ የማሽከርከር አኒሜሽን
-                    const extraDegrees = Math.floor(Math.random() * 360) + 720;
-                    wheel.style.transform = `rotate(${extraDegrees}deg)`;
-                };
+                b.className = 'num-btn';
+                
+                // 🚨 ቁጥሩ ከተሸጠ በቀይ ከለር መለየት
+                if (currentSold.includes(i.toString())) {
+                    b.classList.add('sold');
+                    b.innerText = i + "\nተሽጧል";
+                    b.disabled = true; // እንዳይነካ መዝጋት
+                } else {
+                    b.innerText = i;
+                    b.onclick = () => {
+                        selectedNum = i;
+                        document.querySelectorAll('.num-btn').forEach(btn => btn.classList.remove('active'));
+                        b.classList.add('active');
+                        document.getElementById('confirm-btn').style.display = 'block';
+                        
+                        const extraDegrees = Math.floor(Math.random() * 360) + 720;
+                        wheel.style.transform = `rotate(${extraDegrees}deg)`;
+                    };
+                }
                 grid.appendChild(b);
             }
         }
@@ -101,7 +124,6 @@
             tg.close();
         }
         
-        // መጀመሪያ ገጹ ሲከፈት እንዲሰራ ማድረግ
         renderGrid();
     </script>
 </body>
