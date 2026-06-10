@@ -7,13 +7,20 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { font-family: sans-serif; background-color: #121212; color: white; text-align: center; padding: 20px; margin: 0; }
-        .wheel-container { position: relative; width: 260px; height: 260px; margin: 20px auto; }
+        .wheel-container { position: relative; width: 280px; height: 280px; margin: 20px auto; }
         .wheel {
             width: 100%; height: 100%; border-radius: 50%; border: 5px solid #d4af37;
             background: conic-gradient(#e74c3c 0deg 36deg, #3498db 36deg 72deg, #2ecc71 72deg 108deg, #f1c40f 108deg 144deg, #9b59b6 144deg 180deg, #1abc9c 180deg 216deg, #e67e22 216deg 252deg, #34495e 252deg 288deg, #27ae60 288deg 324deg, #8e44ad 324deg 360deg);
             transition: transform 4s cubic-bezier(0.1, 0.8, 0.1, 1);
+            position: relative; overflow: hidden;
         }
-        .pointer { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 25px solid #d4af37; z-index: 10; }
+        /* 🔢 በክበቡ ላይ የሚቀመጡ ቁጥሮች ስታይል */
+        .wheel-number {
+            position: absolute; width: 30px; height: 30px; top: 10px; left: 125px;
+            transform-origin: 15px 130px; text-align: center; font-weight: bold;
+            font-size: 16px; color: white; text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+        }
+        .pointer { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 25px solid #d4af37; z-index: 10; }
         .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; max-width: 350px; margin: 20px auto; }
         .num-btn { background: #1e272e; border: 2px solid #2f3542; color: white; padding: 15px 0; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 16px; }
         .num-btn.active { border-color: #d4af37; background: #aa7c11; }
@@ -30,7 +37,12 @@
         <button class="room-btn" id="r50" onclick="setRoom('50')">🥈 50 ብር</button>
         <button class="room-btn" id="r100" onclick="setRoom('100')">🥇 100 ብር</button>
     </div>
-    <div class="wheel-container"><div class="pointer"></div><div class="wheel" id="wheel"></div></div>
+    
+    <div class="wheel-container">
+        <div class="pointer"></div>
+        <div class="wheel" id="wheel"></div>
+    </div>
+    
     <div class="grid" id="grid"></div>
     <button id="confirm-btn" onclick="sendData()">✅ የመረጥኩትን ቁጥር አስመዝግብ</button>
 
@@ -49,14 +61,34 @@
         function renderGrid() {
             const grid = document.getElementById('grid'); grid.innerHTML = '';
             const count = selectedRoom === '30' ? 10 : 5;
+            
+            // 🔄 በመንኮራኩሩ ላይ ቁጥሮቹን በክብ ቅርጽ መደርደር
+            const wheel = document.getElementById('wheel');
+            wheel.innerHTML = '';
+            const angleStep = 360 / count;
+            
             for(let i=1; i<=count; i++) {
-                const b = document.createElement('button'); b.className = 'num-btn'; b.innerText = i;
+                // 1. ለመንኮራኩሩ ቁጥር መፍጠር
+                const numDiv = document.createElement('div');
+                numDiv.className = 'wheel-number';
+                numDiv.innerText = i;
+                // ቁጥሩን በተገቢው ዲግሪ ማሽከርከር (ወደ መሃል እንዲያይ)
+                numDiv.style.transform = `rotate(${(i-1) * angleStep + (angleStep/2)}deg)`;
+                wheel.appendChild(numDiv);
+
+                // 2. ከታች የሚጫኑትን ቁልፎች (Grid Buttons) መፍጠር
+                const b = document.createElement('button'); 
+                b.className = 'num-btn'; 
+                b.innerText = i;
                 b.onclick = () => {
                     selectedNum = i;
                     document.querySelectorAll('.num-btn').forEach(btn => btn.classList.remove('active'));
                     b.classList.add('active');
                     document.getElementById('confirm-btn').style.display = 'block';
-                    document.getElementById('wheel').style.transform = `rotate(${Math.floor(Math.random() * 3600) + 720}deg)`;
+                    
+                    // መንኮራኩሩን በዘፈቀደ የማሽከርከር አኒሜሽን
+                    const extraDegrees = Math.floor(Math.random() * 360) + 720;
+                    wheel.style.transform = `rotate(${extraDegrees}deg)`;
                 };
                 grid.appendChild(b);
             }
@@ -68,6 +100,8 @@
             tg.sendData(data);
             tg.close();
         }
+        
+        // መጀመሪያ ገጹ ሲከፈት እንዲሰራ ማድረግ
         renderGrid();
     </script>
 </body>
